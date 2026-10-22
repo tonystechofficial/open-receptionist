@@ -9,6 +9,9 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "test": "node --test",
-    "assistant:create": "node vapi/create-assistant.mjs"
+    "assistant:create": "node vapi/create-assistant.mjs",
+    "db:init": "npx wrangler d1 execute open-receptionist --remote --file migrations/0001_init.sql",
+    "cf:dev": "npx wrangler dev --local",
+    "deploy": "npx wrangler deploy"
   }
 }

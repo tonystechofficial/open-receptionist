@@ -1,0 +1,22 @@
+name = "open-receptionist"
+main = "worker/index.mjs"
+compatibility_date = "2026-09-01"
+
+# Create the database once with an EU location, then paste its id here:
+#   npx wrangler d1 create open-receptionist --location weur
+[[d1_databases]]
+binding = "DB"
+database_name = "open-receptionist"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Non-secret, per-client values. Secrets (the *_API_KEY and WEBHOOK_SECRET) are set with
+# `npx wrangler secret put <NAME>`, never committed here.
+[vars]
+CLIENT_COMPANY = "Plomberie Dupont"
+CLIENT_METIER = "plomberie"
+CLIENT_HORAIRES = "du lundi au vendredi, de 8h a 18h"
+NOTIFY_EMAIL = "contact@plomberie-dupont.fr"
+NOTIFY_SMS = "33612345678"
+CALCOM_EVENT_TYPE_ID = "123456"
+MAIL_FROM = "Accueil <accueil@your-domain.fr>"
+SMS_SENDER = "Accueil"

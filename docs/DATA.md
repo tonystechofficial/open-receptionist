@@ -42,6 +42,23 @@ the EU only. Processing is not storage, but for an RGPD posture it matters:
 - For regulated or health data, do not rely on a US-routed platform. Use the self-hosted,
   EU-hosted stack in [PROVIDERS.md](PROVIDERS.md), where you own every hop.
 
+## Hosting the database on Cloudflare D1 (free tier)
+
+The default deployment stores records in **Cloudflare D1**, a SQLite database on Cloudflare's free
+tier (`src/db/d1.mjs`, schema in `migrations/0001_init.sql`). Create it with an EU location so the
+records sit in Europe:
+
+```bash
+npx wrangler d1 create open-receptionist --location weur
+```
+
+`weur` is Western Europe. This addresses the storage side of the RGPD posture: the appointment and
+call records live in an EU-hosted database you control. It does not change the caveat above about
+the voice platform's realtime processing, which is a separate hop.
+
+Because `src/db/d1.mjs` implements the same `{ saveCall, saveAppointment, all }` interface as the
+file store, nothing else in the codebase knows or cares that the database is D1.
+
 ## The rule this encodes
 
 Keep the business records in a database you control and host where you need them. Treat the voice

@@ -52,14 +52,49 @@ A new client is a new config, not new code. See `config/client.example.json`:
 npm test                       # run the core unit tests (no dependencies, no keys)
 cp .env.example .env           # fill in your keys
 cp config/client.example.json config/client.json   # describe your client
-# deploy api/ to a host that exposes /api/tools and /api/call-report (e.g. Vercel)
-VAPI_PRIVATE_KEY=... WEBHOOK_BASE_URL=https://your-deploy node vapi/create-assistant.mjs
-# then attach a phone number to the assistant in the Vapi dashboard and call it
+# then deploy (see "Deploy" below) and point the assistant at the deployment URL
 ```
 
 A French `+33` number needs a Twilio or Telnyx regulatory bundle (ID plus a French address),
 which takes a day or two. Start the demo on the number the platform gives you and get the `+33`
 in parallel.
+
+## Deploy
+
+Two targets ship here. The pure core and the providers are identical on both; only the server
+entry and the store differ. The business logic never changes.
+
+### Cloudflare Workers + D1 (free tier, EU, recommended)
+
+Your database (D1) is the source of truth, on Cloudflare's free tier, pinned to an EU location.
+
+```bash
+npx wrangler login
+npx wrangler d1 create open-receptionist --location weur   # paste the id into wrangler.toml
+npm run db:init                                            # apply migrations/0001_init.sql
+npx wrangler secret put WEBHOOK_SECRET
+npx wrangler secret put CALCOM_API_KEY
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put BREVO_API_KEY
+# edit the [vars] block in wrangler.toml (company, metier, recipients, Cal.com event type, MAIL_FROM)
+npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev
+```
+
+Local dev: copy `.dev.vars.example` to `.dev.vars`, then `npm run cf:dev` (uses a local D1).
+
+### Vercel (Node functions)
+
+`api/tools` and `api/call-report` are Vercel-style handlers. Set env from `.env.example`, keep the
+JSON-file store or point at a hosted DB, and `vercel --prod`.
+
+### Then, on either host
+
+```bash
+VAPI_PRIVATE_KEY=... WEBHOOK_BASE_URL=https://<your-deploy> WEBHOOK_SECRET=<same-as-secret> \
+  node vapi/create-assistant.mjs
+```
+
+Attach a phone number to the assistant in the Vapi dashboard and call it.
 
 ## Data and privacy
 
