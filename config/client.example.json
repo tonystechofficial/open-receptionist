@@ -1,0 +1,13 @@
+{
+  "company": "Plomberie Dupont",
+  "metier": "plomberie",
+  "horaires": "du lundi au vendredi, de 8h à 18h",
+  "calendar": { "provider": "calcom", "id": "123456" },
+  "notify": {
+    "email": ["contact@plomberie-dupont.fr"],
+    "sms": ["33612345678"]
+  },
+  "voice": { "provider": "11labs", "voiceId": "REMPLACER_PAR_UNE_VOIX_FR" },
+  "maxDurationSeconds": 180,
+  "recordingEnabled": false
+}

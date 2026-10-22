@@ -1,0 +1,14 @@
+{
+  "name": "open-receptionist",
+  "version": "0.1.0",
+  "description": "Provider-agnostic AI phone receptionist for small businesses. Your database is the source of truth; the voice platform (Vapi, Retell, ...) is replaceable transport.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Tony's Tech",
+  "repository": "github:tonystechofficial/open-receptionist",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "assistant:create": "node vapi/create-assistant.mjs"
+  }
+}
