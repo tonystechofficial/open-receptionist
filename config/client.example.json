@@ -1,13 +1,18 @@
 {
   "company": "Plomberie Dupont",
   "metier": "plomberie",
-  "horaires": "du lundi au vendredi, de 8h à 18h",
+  "horaires": "du lundi au vendredi, de 8 h à 18 h",
+  "telephone": "05 56 12 34 56",
+  "timeZone": "Europe/Paris",
   "calendar": { "provider": "calcom", "id": "123456" },
   "notify": {
     "email": ["contact@plomberie-dupont.fr"],
     "sms": ["33612345678"]
   },
+  "smsSender": "Dupont",
+  "confirmation": { "sms": true },
   "voice": { "provider": "11labs", "voiceId": "REMPLACER_PAR_UNE_VOIX_FR" },
-  "maxDurationSeconds": 180,
-  "recordingEnabled": false
+  "maxDurationSeconds": 300,
+  "recordingEnabled": false,
+  "urgences": "Odeur de gaz : demande à la personne de sortir tout de suite avec tout le monde, de ne toucher à aucun interrupteur ni appareil électrique, de ne pas allumer de flamme, de fermer le robinet de gaz si c'est possible sans risque, puis d'appeler depuis l'extérieur Urgence Sécurité Gaz au 0 800 47 33 33, gratuit et joignable jour et nuit, ou le 112 en cas de malaise ou d'odeur très forte. Ne prends pas de rendez-vous avant d'avoir donné ces consignes. Fuite d'eau importante : conseille de fermer le robinet d'arrêt général du logement et, si l'eau approche des prises ou du tableau électrique, de couper le courant au disjoncteur."
 }

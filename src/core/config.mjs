@@ -2,9 +2,11 @@
 
 const DEFAULTS = {
   language: 'fr',
+  timeZone: 'Europe/Paris',
   recordingEnabled: false, // off by default; see docs/DATA.md
-  maxDurationSeconds: 180,
+  maxDurationSeconds: 300, // qualifying, choosing a slot and confirming can run past 3 minutes
   voice: { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' },
+  confirmation: { sms: true }, // SMS the caller once the appointment is booked
 };
 
 /**
@@ -27,6 +29,18 @@ export function validateClientConfig(cfg = {}) {
     errors.push('at least one notify channel (email or sms) is required');
   }
 
-  const config = { ...DEFAULTS, ...cfg, voice: cfg.voice || DEFAULTS.voice };
+  // Operators accept an alphanumeric sender of 3 to 11 characters; anything else is rejected at send time.
+  if (cfg.smsSender != null && !/^[A-Za-z0-9]{3,11}$/.test(String(cfg.smsSender))) {
+    errors.push('smsSender must be 3 to 11 letters or digits');
+  }
+
+  // A field explicitly set to undefined (an unset environment variable) must not erase a default.
+  const config = { ...DEFAULTS };
+  for (const [key, value] of Object.entries(cfg)) {
+    if (value !== undefined) config[key] = value;
+  }
+  config.voice = cfg.voice || DEFAULTS.voice;
+  config.confirmation = { ...DEFAULTS.confirmation, ...(cfg.confirmation || {}) };
+
   return { ok: errors.length === 0, errors, config };
 }

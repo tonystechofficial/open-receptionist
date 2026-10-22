@@ -1,66 +1,79 @@
 # Where the data lives
 
-The question that decides the architecture: when a call happens, is the caller's data stored
-only in our database, or also in the voice platform?
+The question that decides the architecture: when a call happens, is the caller's data stored only
+in our database, or also in the voice platform?
 
 ## The flow
 
 1. The caller speaks. The platform (Vapi) runs the realtime loop: speech-to-text, the model, the
    voice. Audio and transcript pass **through** the platform in real time.
-2. During the call, the model calls our tools (`/api/tools`): read availability, book a slot. The
-   booking is written to the **calendar** and to **our database**.
-3. At the end, the platform posts an **end-of-call report** to `/api/call-report`. We extract the
-   structured fields, run them through `qualify`, and persist the call record in **our database**,
-   then send the recap by email and SMS.
+2. During the call, the agent calls our tools on `/api/vapi`. `noter_demande` and `prendre_rdv`
+   write the caller's details into **our database**; `prendre_rdv` also books in the **calendar**.
+3. At the end, the platform posts an **end-of-call report** to the same endpoint. We merge what the
+   tools captured with the platform's summary and the caller ID, store the final call record in
+   **our database**, and send the owner one recap.
 
-So the appointment and the caller record always end up in **our database**, because our webhook
-writes them there. That part never depends on the platform.
+The caller's details and the appointment end up in our database because our webhook writes them
+there, during the call. That never depends on the platform's own data features.
+
+## What our database keeps
+
+Two tables, created by `migrations/0001_init.sql` in Cloudflare D1:
+
+- **`calls`**, one row per call, keyed by the platform's call id: name, need, urgency, phone
+  (international form), email, whether the details are complete, the status (`rdv` or
+  `a_rappeler`), the urgent flag, the two slots offered as options 1 and 2, the platform's summary,
+  a note when the calendar failed, and `recap_sent_at`.
+- **`appointments`**, one row per booking: the call it came from, the UTC start, the French label sent
+  to the caller, the caller's details and the calendar's booking reference.
+
+Two guarantees come from this shape:
+
+- **One booking per call.** A repeated booking request finds the existing appointment and confirms it
+  instead of booking again.
+- **One recap per call.** `recap_sent_at` is set after the owner recap goes out, so a redelivered
+  end-of-call report sends nothing.
 
 ## What the platform keeps
 
 By default the voice platform stores call artifacts on its side: transcript, summary, structured
-data, logs, and the audio recording if recording is enabled.
+data, logs, and the audio recording if recording is on.
 
-- Recording is **off** in this project (`artifactPlan.recordingEnabled = false`), so there is no
-  stored audio.
-- Transcript, summary, structured data and logs still sit on the platform **unless** you enable
-  **Zero Data Retention (ZDR)**.
+- Recording is **off** in this project (`artifactPlan.recordingEnabled = false`).
+- Transcript, summary and logs still sit on the platform **unless** you enable **Zero Data
+  Retention**. With it on, Vapi keeps only metadata: call id, timestamps, duration, cost.
 
-With ZDR on, the platform keeps only **metadata**: call id, timestamps, duration, cost, latency.
-The content is not retained. That is exactly why `/api/call-report` is mandatory: with ZDR on, our
-webhook is the **only** place the call content survives. Miss it and the content is gone.
-
-## The honest caveat
-
-ZDR removes **storage** on the platform. It does not remove **processing**: the audio still
-transits the platform's realtime pipeline, and for Vapi that pipeline is not guaranteed to run in
-the EU only. Processing is not storage, but for an RGPD posture it matters:
-
-- For a plumber or a restaurant (no sensitive data), this is defensible with: the AI disclosure at
-  the start of the call (AI Act article 50), a CNIL information line, recording off, data
-  minimization, and a data processing agreement.
-- For regulated or health data, do not rely on a US-routed platform. Use the self-hosted,
-  EU-hosted stack in [PROVIDERS.md](PROVIDERS.md), where you own every hop.
+Because our tools capture the caller's details during the call, turning on Zero Data Retention loses
+nothing we need. Only the summary in the owner recap would go.
 
 ## Hosting the database on Cloudflare D1 (free tier)
 
-The default deployment stores records in **Cloudflare D1**, a SQLite database on Cloudflare's free
-tier (`src/db/d1.mjs`, schema in `migrations/0001_init.sql`). Create it with an EU location so the
-records sit in Europe:
+Create the database with an EU location so the records sit in Europe:
 
 ```bash
 npx wrangler d1 create open-receptionist --location weur
 ```
 
-`weur` is Western Europe. This addresses the storage side of the RGPD posture: the appointment and
-call records live in an EU-hosted database you control. It does not change the caveat above about
-the voice platform's realtime processing, which is a separate hop.
+`weur` is Western Europe. Because `src/db/d1.mjs` implements the same interface as the in-memory
+store, nothing else in the codebase knows the database is D1. The tests run the real migration and
+the store's SQL on SQLite, which D1 is built on.
 
-Because `src/db/d1.mjs` implements the same `{ saveCall, saveAppointment, all }` interface as the
-file store, nothing else in the codebase knows or cares that the database is D1.
+## Retention
+
+RGPD requires a defined retention period. Decide one with each client, for example twelve months for
+call records, and delete older rows. A scheduled Worker can do it; it is not built yet.
+
+## The honest caveat
+
+Zero Data Retention removes **storage** on the platform. It does not remove **processing**: the audio
+still transits the platform's realtime pipeline, and for Vapi that pipeline is not guaranteed to run
+in the EU only. For a plumber or a restaurant this is defensible with the AI disclosure at the start
+of the call, a CNIL information line, recording off, data minimisation and a data processing
+agreement. For regulated or health data, use the self-hosted stack in [PROVIDERS.md](PROVIDERS.md),
+where you own every hop.
 
 ## The rule this encodes
 
-Keep the business records in a database you control and host where you need them. Treat the voice
-platform as transport that should retain nothing. If you ever change platform, your data and your
-logic come with you, because they were never inside it.
+Keep the business records in a database you control, hosted where you need them, and let the voice
+platform retain nothing. If you change platform, your data and your flows come with you, because
+they were never inside it.

@@ -1,6 +1,6 @@
 {
   "name": "open-receptionist",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Provider-agnostic AI phone receptionist for small businesses. Your database is the source of truth; the voice platform (Vapi, Retell, ...) is replaceable transport.",
   "type": "module",
   "license": "MIT",
@@ -10,8 +10,10 @@
   "scripts": {
     "test": "node --test",
     "assistant:create": "node vapi/create-assistant.mjs",
-    "db:init": "npx wrangler d1 execute open-receptionist --remote --file migrations/0001_init.sql",
+    "db:init": "npx wrangler d1 migrations apply open-receptionist --remote",
+    "db:init:local": "npx wrangler d1 migrations apply open-receptionist --local",
     "cf:dev": "npx wrangler dev --local",
+    "cf:tail": "npx wrangler tail",
     "deploy": "npx wrangler deploy"
   }
 }

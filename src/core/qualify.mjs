@@ -4,6 +4,8 @@ const IMMEDIATE = [
   'fuite', 'inond', 'urgent', 'tout de suite', 'immédiat', 'immediat', 'maintenant',
   'dégât', 'degat', 'panne', "plus d'eau", 'déborde', 'deborde', 'danger', 'gaz',
 ];
+const LEVELS = ['normale', 'haute', 'immediate'];
+
 const HAUTE = [
   'cette semaine', 'demain', 'rapide', 'bientôt', 'bientot', 'dès que', 'des que', 'au plus vite',
 ];
@@ -41,8 +43,11 @@ export function qualify(raw = {}) {
   const besoin = (raw.besoin || '').trim();
   const telephone = normPhone(raw.telephone);
   const email = normEmail(raw.email);
-  // Urgency can be stated in the dedicated field or slip into the description of the need.
-  const urgence = level([raw.urgence, raw.besoin].filter(Boolean).join(' '));
+  // Urgency comes from the level the agent states and from the words of the need; the higher wins,
+  // so "normale" from the agent never hides a "fuite" in the description.
+  const explicit = LEVELS.includes(raw.urgence) ? raw.urgence : null;
+  const fromText = level([raw.urgence, raw.besoin].filter(Boolean).join(' '));
+  const urgence = explicit && LEVELS.indexOf(explicit) > LEVELS.indexOf(fromText) ? explicit : fromText;
 
   const manquants = [];
   if (!nom) manquants.push('nom');
@@ -50,4 +55,16 @@ export function qualify(raw = {}) {
   if (!telephone && !email) manquants.push('contact');
 
   return { nom, besoin, urgence, telephone, email, complet: manquants.length === 0, manquants };
+}
+
+/**
+ * Combine what two steps of the same call learned about the caller. A field the later step leaves
+ * empty keeps its earlier value, and urgency never goes down: once urgent, the call stays urgent.
+ */
+export function mergeCaller(earlier, later) {
+  if (!earlier) return later ?? null;
+  if (!later) return earlier;
+  const pick = (k) => (later[k] !== null && later[k] !== undefined && later[k] !== '' ? later[k] : earlier[k] ?? null);
+  const urgence = LEVELS.indexOf(later.urgence) >= LEVELS.indexOf(earlier.urgence) ? later.urgence : earlier.urgence;
+  return qualify({ nom: pick('nom'), besoin: pick('besoin'), urgence, telephone: pick('telephone'), email: pick('email') });
 }

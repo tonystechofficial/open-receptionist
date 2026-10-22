@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { qualify } from '../src/core/qualify.mjs';
+import { qualify, mergeCaller } from '../src/core/qualify.mjs';
 
 test('maps urgent wording to immediate', () => {
   const r = qualify({ nom: 'Jean', besoin: "j'ai une fuite d'eau", urgence: 'il faut venir tout de suite', telephone: '0612345678' });
@@ -37,4 +37,31 @@ test('a call with name, need and one contact is complete', () => {
   const r = qualify({ nom: 'Jean', besoin: 'fuite', telephone: '0612345678' });
   assert.equal(r.complet, true);
   assert.deepEqual(r.manquants, []);
+});
+
+test('honours an explicit urgency level given by the agent', () => {
+  const r = qualify({ nom: 'Jean', besoin: 'un devis', urgence: 'haute', telephone: '0612345678' });
+  assert.equal(r.urgence, 'haute');
+});
+
+test('the description can raise the urgency above the level the agent gave', () => {
+  const r = qualify({ nom: 'Jean', besoin: "fuite d'eau", urgence: 'normale', telephone: '0612345678' });
+  assert.equal(r.urgence, 'immediate');
+});
+
+test('mergeCaller keeps what an earlier step learned when a later step omits it', () => {
+  const earlier = qualify({ nom: 'Jean Dupont', besoin: 'fuite', urgence: 'immediate', email: 'jean@x.fr', telephone: '0612345678' });
+  const later = qualify({ nom: 'Jean Dupont', besoin: 'rappelez-moi pour le devis', urgence: 'normale' });
+  const m = mergeCaller(earlier, later);
+  assert.equal(m.email, 'jean@x.fr');
+  assert.equal(m.telephone, '+33612345678');
+  assert.equal(m.besoin, 'rappelez-moi pour le devis');
+  assert.equal(m.urgence, 'immediate'); // once urgent, the call stays urgent
+  assert.equal(m.complet, true);
+});
+
+test('mergeCaller tolerates a missing side', () => {
+  const only = qualify({ nom: 'Jean', besoin: 'devis', telephone: '0612345678' });
+  assert.equal(mergeCaller(null, only).nom, 'Jean');
+  assert.equal(mergeCaller(only, null).nom, 'Jean');
 });

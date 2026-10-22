@@ -4,19 +4,27 @@ compatibility_date = "2026-09-01"
 
 # Create the database once with an EU location, then paste its id here:
 #   npx wrangler d1 create open-receptionist --location weur
+# Then apply the schema with `npm run db:init` (wrangler d1 migrations apply).
 [[d1_databases]]
 binding = "DB"
 database_name = "open-receptionist"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
 
 # Non-secret, per-client values. Secrets (the *_API_KEY and WEBHOOK_SECRET) are set with
 # `npx wrangler secret put <NAME>`, never committed here.
 [vars]
 CLIENT_COMPANY = "Plomberie Dupont"
 CLIENT_METIER = "plomberie"
-CLIENT_HORAIRES = "du lundi au vendredi, de 8h a 18h"
+CLIENT_HORAIRES = "du lundi au vendredi, de 8 h a 18 h"
+CLIENT_TELEPHONE = "05 56 12 34 56"   # given to the caller in the confirmation SMS
+TIME_ZONE = "Europe/Paris"
 NOTIFY_EMAIL = "contact@plomberie-dupont.fr"
 NOTIFY_SMS = "33612345678"
+CONFIRM_CALLER_SMS = "true"           # "false" to stop texting the caller after a booking
 CALCOM_EVENT_TYPE_ID = "123456"
 MAIL_FROM = "Accueil <accueil@your-domain.fr>"
-SMS_SENDER = "Accueil"
+SMS_SENDER = "Accueil"                # 3 to 11 letters or digits
+# Only if Cal.com moves its API versions again (defaults: slots 2024-09-04, bookings 2026-02-25):
+# CALCOM_SLOTS_API_VERSION = "2024-09-04"
+# CALCOM_BOOKINGS_API_VERSION = "2026-02-25"

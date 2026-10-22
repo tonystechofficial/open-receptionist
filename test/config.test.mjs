@@ -25,11 +25,39 @@ test('accepts a valid config and applies defaults', () => {
   assert.equal(r.ok, true);
   assert.equal(r.config.language, 'fr');
   assert.equal(r.config.recordingEnabled, false);
-  assert.equal(r.config.maxDurationSeconds, 180);
+  // 5 minutes: qualifying, choosing a slot and confirming can run past 3 minutes.
+  assert.equal(r.config.maxDurationSeconds, 300);
   assert.ok(r.config.voice);
 });
 
 test('keeps an explicit voice override', () => {
   const r = validateClientConfig({ ...base, voice: { provider: '11labs', voiceId: 'xyz' } });
   assert.equal(r.config.voice.provider, '11labs');
+});
+
+test('defaults the time zone to Paris and turns the caller SMS confirmation on', () => {
+  const r = validateClientConfig(base);
+  assert.equal(r.config.timeZone, 'Europe/Paris');
+  assert.equal(r.config.confirmation.sms, true);
+});
+
+test('keeps the caller SMS confirmation off when asked', () => {
+  const r = validateClientConfig({ ...base, confirmation: { sms: false } });
+  assert.equal(r.config.confirmation.sms, false);
+});
+
+test('an undefined field does not erase a default', () => {
+  const r = validateClientConfig({ ...base, timeZone: undefined, maxDurationSeconds: undefined });
+  assert.equal(r.config.timeZone, 'Europe/Paris');
+  assert.equal(r.config.maxDurationSeconds, 300);
+});
+
+test('rejects an SMS sender the operators would refuse', () => {
+  const r = validateClientConfig({ ...base, smsSender: 'Plomberie Dupont Bordeaux' });
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.includes('smsSender')));
+});
+
+test('accepts a short alphanumeric SMS sender', () => {
+  assert.equal(validateClientConfig({ ...base, smsSender: 'Dupont' }).ok, true);
 });

@@ -1,73 +1,282 @@
-// Business logic that wires the pure core to the providers and the store.
-// Integration glue (no unit tests here); the decisions it relies on are tested in src/core.
-import { qualify } from '../core/qualify.mjs';
+// The call flows: what the agent is told to say at each step, and what is booked, stored and sent.
+// Decisions live in the pure core (src/core); this file wires them to the calendar, the store and
+// the notifiers. Every tool call returns one line for the agent and never throws: an error in a
+// webhook would leave the caller in silence. See docs/FLOWS.md for each flow in plain words.
+import { qualify, mergeCaller } from '../core/qualify.mjs';
+import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant, withoutSlot } from '../core/slots.mjs';
+import { confirmationSms, ownerRecap } from '../core/messages.mjs';
 import * as vapi from '../providers/voice/vapi.mjs';
 
-/**
- * Handle a `tool-calls` webhook: the model asked to read availability or book.
- * deps: { calendar, notify, store, config }
- */
+const DAY_MS = 86_400_000;
+const MISSING = { nom: 'le nom', besoin: 'le besoin', contact: 'un numéro de téléphone ou un email' };
+
+/** Single entry point for everything the voice platform posts to the webhook. */
+export async function handleVapiMessage(message, deps) {
+  if (message?.type === 'tool-calls') return handleToolCall(message, deps);
+  if (vapi.isEndOfCall(message)) return handleCallReport(message, deps);
+  return { ignored: true };
+}
+
 export async function handleToolCall(message, deps) {
+  const ctx = context(message, deps);
   const results = [];
   for (const call of vapi.getToolCalls(message)) {
     const name = call.function?.name ?? call.name;
+    const toolCallId = call.id ?? call.toolCallId;
     const args = parseArgs(call.function?.arguments ?? call.arguments);
-    const id = call.id ?? call.toolCallId;
-
-    if (name === 'verifier_dispos') {
-      const jours = Number(args.jours) || 7;
-      const from = new Date().toISOString();
-      const to = new Date(Date.now() + jours * 86400_000).toISOString();
-      const slots = await deps.calendar.getAvailableSlots({ from, to });
-      results.push({ toolCallId: id, result: slots.slice(0, 20).join(', ') || 'aucun créneau disponible' });
-    } else if (name === 'prendre_rdv') {
-      const q = qualify({ nom: args.nom, besoin: args.besoin, telephone: args.telephone, email: args.email });
-      const booking = await deps.calendar.createBooking({
-        start: args.creneau, name: q.nom || args.nom, email: q.email, phone: q.telephone, notes: q.besoin,
-      });
-      await deps.store.saveAppointment({ at: args.creneau, caller: q, booking, ts: Date.now() });
-      results.push({ toolCallId: id, result: `Rendez-vous confirmé pour ${args.creneau}.` });
-    } else {
-      results.push({ toolCallId: id, result: `Outil inconnu : ${name}` });
+    let result;
+    try {
+      if (name === 'verifier_dispos') result = await checkAvailability(args, ctx);
+      else if (name === 'prendre_rdv') result = await book(args, ctx);
+      else if (name === 'noter_demande') result = await recordRequest(args, ctx);
+      else result = `Outil inconnu : ${name}.`;
+    } catch (error) {
+      ctx.log('tool failed', name, error);
+      result = `Je n'arrive pas à traiter cette demande pour le moment. Dis à l'appelant que ${ctx.company} le rappelle, et vérifie son numéro.`;
     }
+    results.push({ name, toolCallId, result: oneLine(result) });
   }
   return vapi.toolResults(results);
 }
 
 /**
- * Handle the `end-of-call-report` webhook: persist the call to YOUR DB (the source of truth)
- * and send the recap. With Zero Data Retention on, this is the only place the content survives.
+ * End of call: merge what the tools captured with Vapi's analysis, record the call in OUR
+ * database, and send the owner one recap. A redelivered report is recognised and not resent.
  */
 export async function handleCallReport(message, deps) {
   if (!vapi.isEndOfCall(message)) return { ignored: true };
-  const raw = vapi.extractStructuredData(message);
-  const q = qualify({ nom: raw.nom, besoin: raw.besoin, urgence: raw.urgence, telephone: raw.telephone, email: raw.email });
-  const record = {
-    caller: q,
-    souhaite: raw.creneau_souhaite ?? null,
-    summary: message.analysis?.summary ?? null,
-    endedAt: message.endedAt ?? new Date().toISOString(),
-  };
-  const saved = await deps.store.saveCall(record);
-  await sendRecap(saved, deps);
-  return { ok: true, id: saved.id };
+  const ctx = context(message, deps);
+  const { store } = deps;
+
+  const existing = await store.getCall(ctx.callId);
+  if (existing?.recapSentAt) return { ok: true, duplicate: true, callId: ctx.callId };
+
+  const analysis = vapi.getAnalysis(message);
+  const fromAnalysis = analysis.structuredData ?? {};
+  const fallback = qualify({
+    nom: fromAnalysis.nom,
+    besoin: fromAnalysis.besoin,
+    urgence: fromAnalysis.urgence,
+    telephone: fromAnalysis.telephone || ctx.callerNumber,
+    email: fromAnalysis.email,
+  });
+  const caller = mergeCaller(fallback, existing?.caller ?? null); // what the tools captured wins
+  const appointment = await store.findAppointmentByCallId(ctx.callId);
+  const recap = ownerRecap({ company: ctx.company, caller, appointment, summary: analysis.summary });
+
+  await store.upsertCall(ctx.callId, {
+    caller,
+    summary: analysis.summary,
+    status: appointment ? 'rdv' : 'a_rappeler',
+    urgent: recap.urgent,
+    endedAt: message.endedAt ?? ctx.now.toISOString(),
+    endedReason: message.endedReason ?? null,
+  });
+  await sendOwnerRecap(recap, ctx);
+  await store.upsertCall(ctx.callId, { recapSentAt: ctx.now.toISOString() });
+  return { ok: true, callId: ctx.callId };
 }
 
-async function sendRecap(rec, deps) {
-  const q = rec.caller;
-  const line = `Appel : ${q.nom || '?'} — ${q.besoin || '?'} — urgence ${q.urgence} — ${q.telephone || q.email || 'pas de contact'}${rec.souhaite ? ` — souhait : ${rec.souhaite}` : ''}`;
-  const to = deps.config?.notify || {};
-  if (deps.notify?.email && Array.isArray(to.email) && to.email.length) {
-    await deps.notify.email({ to: to.email, subject: `Nouvel appel — ${q.nom || 'inconnu'}`, html: `<p>${escapeHtml(line)}</p>`, text: line });
+// ---------------------------------------------------------------- tools
+
+async function checkAvailability(args, ctx) {
+  const urgence = qualify({ urgence: args.urgence }).urgence;
+  const preferredDay = resolvePreferredDay(args.jour, ctx.now, ctx.timeZone);
+  const days = Math.min(30, Math.max(clampDays(args.jours), preferredDay ? daysUntilDate(preferredDay, ctx) + 1 : 0));
+  const slots = await fetchSlots(ctx, days);
+
+  const wished = filterSlots(slots, { jour: args.jour, moment: args.moment }, ctx.now, ctx.timeZone);
+  const unmatched = wished.length === 0 && slots.length > 0; // a wish was given and nothing fits it
+  const offer = offerSlots(unmatched ? slots : wished, urgence, ctx.now);
+  await ctx.deps.store.upsertCall(ctx.callId, { offered: offer.options });
+
+  if (offer.none) {
+    return `Aucun créneau disponible dans les ${days} prochains jours. Propose que ${ctx.company} rappelle l'appelant, vérifie son numéro, puis appelle noter_demande.`;
   }
-  if (deps.notify?.sms && Array.isArray(to.sms) && to.sms.length) {
-    for (const n of to.sms) await deps.notify.sms({ to: n, content: line.slice(0, 300) });
+  const lead = [];
+  if (urgence === 'immediate' && !offer.within) {
+    lead.push(`Aucun créneau dans les 4 heures : dis que l'urgence est notée en priorité et que ${ctx.company} rappelle au plus vite, puis propose quand même ces créneaux.`);
+  }
+  if (unmatched) lead.push('Aucun créneau ne correspond à ce souhait ; voici les plus proches.');
+  return [...lead, describeOptions(offer.options, ctx)].join(' ');
+}
+
+async function book(args, ctx) {
+  const { store, calendar } = ctx.deps;
+  const existing = await store.getCall(ctx.callId);
+  const start = resolveChoice(args.creneau, existing?.offered, ctx.now);
+
+  // One booking per call. A repeated request confirms it again; a different slot is not booked
+  // on top of it (the caller's change of mind goes to the owner as a call-back).
+  const already = await store.findAppointmentByCallId(ctx.callId);
+  if (already) {
+    const label = formatSlotFr(already.at, ctx.now, { timeZone: ctx.timeZone });
+    return !start || sameInstant(already.at, start)
+      ? `Rendez-vous déjà confirmé pour ${label}. Ne réserve rien de plus.`
+      : `Un rendez-vous est déjà pris pendant cet appel pour ${label}. Pour le changer, dis que ${ctx.company} rappelle l'appelant ; ne réserve pas un second créneau.`;
+  }
+
+  const caller = mergeCaller(existing?.caller ?? null, qualify({
+    nom: args.nom, besoin: args.besoin, urgence: args.urgence, telephone: args.telephone || ctx.callerNumber, email: args.email,
+  }));
+  if (!caller.complet) {
+    await store.upsertCall(ctx.callId, { caller });
+    return `Il manque ${caller.manquants.map((m) => MISSING[m]).join(' et ')}. Demande-le à l'appelant avant de réserver, puis rappelle prendre_rdv.`;
+  }
+  if (!start) return "Créneau non reconnu. Rappelle verifier_dispos et propose les options qu'il donne.";
+
+  let booking;
+  try {
+    booking = await calendar.createBooking({
+      start: new Date(start).toISOString(),
+      name: caller.nom,
+      email: caller.email ?? undefined,
+      phone: caller.telephone ?? undefined,
+      notes: caller.besoin,
+      timeZone: ctx.timeZone,
+      metadata: { urgence: caller.urgence, callId: ctx.callId },
+    });
+  } catch (error) {
+    return afterBookingFailure(error, start, caller, ctx);
+  }
+
+  const at = new Date(start).toISOString();
+  const written = formatSlotFr(at, ctx.now, { timeZone: ctx.timeZone, style: 'written' });
+  await store.saveAppointment({ callId: ctx.callId, at, label: written, caller, bookingRef: bookingRef(booking), createdAt: ctx.now.toISOString() });
+  await store.upsertCall(ctx.callId, { caller, status: 'rdv' });
+  const smsSent = await confirmToCaller(caller, written, ctx);
+  const spoken = formatSlotFr(at, ctx.now, { timeZone: ctx.timeZone });
+  return `Rendez-vous confirmé pour ${spoken}.${smsSent ? " Dis à l'appelant qu'il va recevoir un SMS de confirmation." : ''} Demande-lui s'il a une autre question, puis conclus.`;
+}
+
+/** A refused booking is either a slot someone else just took (re-offer) or an outage (call-back). */
+async function afterBookingFailure(error, start, caller, ctx) {
+  let fresh = null;
+  try {
+    fresh = await fetchSlots(ctx, Math.max(7, Math.ceil((new Date(start).getTime() - ctx.now.getTime()) / DAY_MS) + 1));
+  } catch {
+    fresh = null;
+  }
+  if (Array.isArray(fresh) && !fresh.some((s) => sameInstant(s, start))) {
+    const offer = offerSlots(withoutSlot(fresh, start), caller.urgence, ctx.now);
+    await ctx.deps.store.upsertCall(ctx.callId, { caller, offered: offer.options });
+    if (offer.none) return `Ce créneau vient d'être pris et il n'y a plus de créneau disponible. Propose que ${ctx.company} rappelle l'appelant.`;
+    return `Ce créneau vient d'être pris. ${describeOptions(offer.options, ctx)}`;
+  }
+  ctx.log('booking failed', error);
+  await ctx.deps.store.upsertCall(ctx.callId, { caller, status: 'a_rappeler', note: "réservation impossible : l'agenda a refusé" });
+  return `Je n'arrive pas à enregistrer le rendez-vous pour le moment. Dis à l'appelant que ${ctx.company} le rappelle pour confirmer, et vérifie son numéro.`;
+}
+
+async function recordRequest(args, ctx) {
+  const existing = await ctx.deps.store.getCall(ctx.callId);
+  const caller = mergeCaller(existing?.caller ?? null, qualify({
+    nom: args.nom, besoin: args.besoin, urgence: args.urgence, telephone: args.telephone || ctx.callerNumber, email: args.email,
+  }));
+  await ctx.deps.store.upsertCall(ctx.callId, { caller });
+  const urgent = caller.urgence === 'immediate' ? ' Elle est marquée urgente.' : '';
+  const missing = caller.manquants.length
+    ? ` Il manque encore ${caller.manquants.map((m) => MISSING[m]).join(' et ')} : demande-le si possible.`
+    : '';
+  return `Demande notée.${urgent}${missing}`;
+}
+
+// ---------------------------------------------------------------- helpers
+
+function context(message, deps) {
+  const config = deps.config ?? {};
+  return {
+    deps,
+    config,
+    company: config.company ?? "l'entreprise",
+    timeZone: config.timeZone ?? 'Europe/Paris',
+    now: deps.now ? deps.now() : new Date(),
+    callId: vapi.getCallId(message) ?? 'appel-sans-identifiant',
+    callerNumber: vapi.getCallerNumber(message),
+    log: deps.log ?? ((...a) => console.error('[open-receptionist]', ...a)),
+  };
+}
+
+function describeOptions(options, ctx) {
+  const listed = options.map((s, i) => `option ${i + 1}, ${formatSlotFr(s, ctx.now, { timeZone: ctx.timeZone })}`);
+  const keys = options.map((_, i) => i + 1).join(' ou ');
+  return `Créneaux à proposer : ${listed.join(' ; ')}. Propose ces options telles quelles, sans lire de date technique. Quand l'appelant choisit, appelle prendre_rdv avec creneau = ${keys}.`;
+}
+
+async function fetchSlots(ctx, days) {
+  const from = ctx.now.toISOString();
+  const to = new Date(ctx.now.getTime() + days * DAY_MS).toISOString();
+  return ctx.deps.calendar.getAvailableSlots({ from, to, timeZone: ctx.timeZone });
+}
+
+/** "1", "option 2" -> the slot offered earlier in this call; an ISO datetime in the future is accepted as is. */
+function resolveChoice(creneau, offered, now) {
+  const value = String(creneau ?? '').trim();
+  if (!value) return null;
+  const n = Number(value.replace(/^option\s*/i, ''));
+  if (Number.isInteger(n) && n >= 1 && Array.isArray(offered) && offered[n - 1]) return offered[n - 1];
+  // A bare "1" would parse as a date in the year 2001: only real ISO datetimes count.
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) && ms > now.getTime() ? value : null;
+}
+
+async function confirmToCaller(caller, label, ctx) {
+  if (ctx.config.confirmation?.sms === false) return false;
+  if (!ctx.deps.notify?.sms || !caller.telephone) return false;
+  try {
+    await ctx.deps.notify.sms({
+      to: caller.telephone,
+      content: confirmationSms({ company: ctx.company, label, contactPhone: ctx.config.telephone }),
+      sender: ctx.config.smsSender,
+    });
+    return true;
+  } catch (error) {
+    ctx.log('caller sms failed', error);
+    return false;
   }
 }
+
+async function sendOwnerRecap(recap, ctx) {
+  const to = ctx.config.notify ?? {};
+  const notify = ctx.deps.notify ?? {};
+  if (notify.email && to.email?.length) {
+    try {
+      await notify.email({ to: to.email, subject: recap.subject, text: recap.text, html: recap.html });
+    } catch (error) {
+      ctx.log('owner email failed', error);
+    }
+  }
+  if (notify.sms && to.sms?.length) {
+    for (const number of to.sms) {
+      try {
+        await notify.sms({ to: number, content: recap.sms, sender: ctx.config.smsSender });
+      } catch (error) {
+        ctx.log('owner sms failed', error);
+      }
+    }
+  }
+}
+
+function clampDays(jours) {
+  const n = Number(jours);
+  return Number.isFinite(n) && n >= 1 ? Math.min(30, Math.round(n)) : 7;
+}
+
+function daysUntilDate(isoDate, ctx) {
+  const today = resolvePreferredDay("aujourd'hui", ctx.now, ctx.timeZone);
+  return Math.max(0, Math.round((Date.parse(`${isoDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS));
+}
+
+function bookingRef(b) {
+  const ref = b?.data?.uid ?? b?.uid ?? b?.data?.id ?? b?.id;
+  return ref === undefined || ref === null ? null : String(ref);
+}
+
+function oneLine(s) { return String(s).replace(/\s+/g, ' ').trim(); }
 
 function parseArgs(a) {
   if (!a) return {};
   if (typeof a === 'object') return a;
   try { return JSON.parse(a); } catch { return {}; }
 }
-function escapeHtml(s) { return String(s).replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
