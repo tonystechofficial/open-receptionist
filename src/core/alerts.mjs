@@ -26,6 +26,20 @@ export function deliveryProblems(calls = []) {
   return problems;
 }
 
+const LOW_SMS_CREDITS = 20; // Brevo counts credits: about ten bookings, a confirmation and a recap each
+const LOW_BALANCE = 5; // Twilio counts money and recharges itself under 10 by default: below 5, it failed
+
+/** What the SMS provider's check says about the credit left, or null when there is enough. */
+export function creditProblem(provider, result = {}) {
+  if (provider === 'brevo' && result.smsCredits != null && result.smsCredits < LOW_SMS_CREDITS) {
+    return `Crédits SMS Brevo presque épuisés : ${result.smsCredits} restants.`;
+  }
+  if (provider === 'twilio' && Number.isFinite(result.balance) && result.balance < LOW_BALANCE) {
+    return `Solde Twilio bas : ${result.balance.toFixed(2)} ${result.currency}. Vérifiez la recharge automatique : à zéro, plus aucun SMS ne part.`;
+  }
+  return null;
+}
+
 /** The email the daily check sends when it finds something. It may reach the owner, hence the forward line. */
 export function alertEmail({ company, problems }) {
   const n = problems.length;

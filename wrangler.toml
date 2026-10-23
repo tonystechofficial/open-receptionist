@@ -11,8 +11,8 @@ database_name = "open-receptionist"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "migrations"
 
-# Non-secret, per-client values. Secrets (the *_API_KEY and WEBHOOK_SECRET) are set with
-# `npx wrangler secret put <NAME>`, never committed here.
+# Non-secret, per-client values. Secrets (the *_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and
+# WEBHOOK_SECRET) are set with `npx wrangler secret put <NAME>`, never committed here.
 [vars]
 CLIENT_COMPANY = "Plomberie Dupont"
 CLIENT_METIER = "plomberie"
@@ -24,7 +24,7 @@ NOTIFY_SMS = "06 12 34 56 78"         # optional: mobiles (06, 07) for the SMS r
 CONFIRM_CALLER_SMS = "true"           # "false" to stop texting the caller after a booking
 CALCOM_EVENT_TYPE_ID = "123456"
 MAIL_FROM = "Accueil <accueil@your-domain.fr>"
-SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 letters or digits; carriers filter "Info" or "Accueil"
+SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 letters or digits, one letter at least; carriers filter "Info" or "Accueil"
 # ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily check's alerts; defaults to the first NOTIFY_EMAIL
 # Only if Cal.com moves its API versions again (defaults: slots 2024-09-04, bookings 2026-02-25):
 # CALCOM_SLOTS_API_VERSION = "2024-09-04"

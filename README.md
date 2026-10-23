@@ -20,7 +20,7 @@ Maintained by Tony's Tech. MIT licensed.
                        POST /api/vapi   (Cloudflare Worker)
                          |          |            |             |
                          v          v            v             v
-                      Cal.com      D1          Resend         Brevo
+                      Cal.com      D1          Resend         Twilio (or Brevo)
                   slots, booking  calls,      owner email    caller confirmation,
                                 appointments                  owner SMS
 ```
@@ -31,7 +31,7 @@ Maintained by Tony's Tech. MIT licensed.
   `booking`, `config`.
 - `src/server/handlers.mjs` — the call flows, described in plain words in [docs/FLOWS.md](docs/FLOWS.md).
 - `src/providers/` — adapters behind small interfaces: `voice/` (Vapi; Retell stub), `calendar/`
-  (Cal.com; Google stub), `notify/` (Resend email, Brevo SMS).
+  (Cal.com; Google stub), `notify/` (Resend email; Twilio or Brevo SMS, picked from the keys set).
 - `src/db/` — the store: Cloudflare D1 for the Worker, memory or a JSON file for local runs.
 - `worker/` — the Cloudflare Worker entry, with a daily cron check that emails failed messages and a
   refused SMS key; `api/` — the Vercel entry. Same flows behind both.
@@ -56,7 +56,7 @@ A new client is a new config, not new code. See `config/client.example.json`:
 ## Quickstart
 
 ```bash
-npm test     # 126 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 144 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -71,7 +71,8 @@ npm run db:init                                            # applies migrations/
 npx wrangler secret put WEBHOOK_SECRET
 npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
-npx wrangler secret put BREVO_API_KEY
+npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio; or BREVO_API_KEY for Brevo
+npx wrangler secret put TWILIO_AUTH_TOKEN
 # edit the [vars] block in wrangler.toml: company, métier, phone, recipients, Cal.com event type
 npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev
 ```
@@ -110,7 +111,8 @@ Records live in **your** database; the voice platform is told to keep only metad
 ## Status
 
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
-  real SQLite, and the Worker's routing, authentication, fallback and daily check (126 tests).
+  real SQLite, the Twilio and Brevo adapters, and the Worker's routing, authentication, fallback and
+  daily check (144 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

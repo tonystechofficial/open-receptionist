@@ -126,3 +126,10 @@ test('without knowing the providers, no provider rule applies', () => {
   assert.equal(r.ok, true, r.errors.join('; '));
   assert.deepEqual(r.warnings, []);
 });
+
+test('an SMS sender made only of digits is refused: carriers read it as a phone number', () => {
+  const r = validateClientConfig({ ...base, smsSender: '12345' });
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.includes('smsSender')), r.errors.join('; '));
+  assert.equal(validateClientConfig({ ...base, smsSender: 'Dupont33' }).ok, true);
+});

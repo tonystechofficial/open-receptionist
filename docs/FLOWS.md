@@ -117,11 +117,12 @@ redelivered report tries again. Each channel's result is kept in `deliveries`.
 ## 12. The daily check
 
 Every morning a cron trigger runs the check, and `GET /api/check` (with the webhook secret) runs it on
-demand. It reports a configuration the Worker would refuse, a missing provider key, an SMS key Brevo
-refuses (its IP blocking, on by default for new accounts, refuses a Worker, which has no fixed IP),
-fewer than 20 SMS credits left, and every SMS or recap that failed in the last 24 hours, as well as
-every ended call that never got a recap. When it finds something, it emails `ALERT_EMAIL`, or the
-first `NOTIFY_EMAIL`, with one line per problem.
+demand. It reports a configuration the Worker would refuse, a missing provider key, SMS credentials
+the provider refuses (Brevo's IP blocking, on by default for new accounts, refuses a Worker, which
+has no fixed IP), low SMS credit (a Twilio balance under 5, or fewer than 20 Brevo credits), and
+every SMS or recap that failed in the last 24 hours, as well as every ended call that never got a
+recap. When it finds something, it emails `ALERT_EMAIL`, or the first `NOTIFY_EMAIL`, with one line
+per problem.
 
 ## Planned, not built
 

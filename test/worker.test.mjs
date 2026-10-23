@@ -146,3 +146,72 @@ test('GET /api/check needs the webhook secret and returns the problems without e
     assert.equal(mails.length, 0);
   });
 });
+
+// Twilio, chosen by its keys: the caller's confirmation goes out through Twilio's API.
+const TWILIO_ENV = { ...ENV, TWILIO_ACCOUNT_SID: 'AC_test_account', TWILIO_AUTH_TOKEN: 'tok', SMS_SENDER: 'Dupont', RESEND_API_KEY: 'resend-key', ALERT_EMAIL: 'tony@example.fr' };
+
+async function withFakeTwilio({ balance = '25.00', balanceStatus = 200 } = {}, fn) {
+  const previous = globalThis.fetch;
+  const seen = { texts: [], mails: [] };
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u.endsWith('/Messages.json')) {
+      seen.texts.push(new URLSearchParams(init.body));
+      return new Response(JSON.stringify({ sid: 'SM1', status: 'queued' }), { status: 201 });
+    }
+    if (u.endsWith('/Balance.json')) {
+      return balanceStatus === 200
+        ? new Response(JSON.stringify({ balance, currency: 'USD' }), { status: 200 })
+        : new Response(JSON.stringify({ code: 20003, message: 'Authenticate', status: balanceStatus }), { status: balanceStatus });
+    }
+    if (u === 'https://api.resend.com/emails') {
+      seen.mails.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ id: 'm1' }), { status: 200 });
+    }
+    if (u.includes('/v2/slots')) {
+      return new Response(JSON.stringify({ status: 'success', data: { '2030-01-07': [{ start: '2030-01-07T09:00:00.000+01:00' }] } }), { status: 200 });
+    }
+    if (u.includes('/v2/bookings')) {
+      return new Response(JSON.stringify({ status: 'success', data: { uid: 'bk_1', start: JSON.parse(init.body).start } }), { status: 201 });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  };
+  try { return await fn(seen); } finally { globalThis.fetch = previous; }
+}
+
+test('with Twilio keys, the booking confirmation is texted through Twilio under the business name', async () => {
+  await withFakeTwilio({}, async (seen) => {
+    const w = createWorker({ makeStore: () => memoryStore() });
+    const call = { id: 'call_tw', customer: { number: '+33612345678' } };
+    const book = { message: { type: 'tool-calls', call, toolCallList: [{ id: 't1', type: 'function', function: { name: 'prendre_rdv', arguments: { creneau: '2030-01-07T08:00:00.000Z', nom: 'Jean Dupont', besoin: 'fuite' } } }] } };
+    const res = await w.fetch(post('/api/vapi', book), TWILIO_ENV);
+    const body = await res.json();
+    assert.match(body.results[0].result, /SMS/);
+    assert.equal(seen.texts.length, 1);
+    assert.equal(seen.texts[0].get('To'), '+33612345678');
+    assert.equal(seen.texts[0].get('From'), 'Dupont');
+  });
+});
+
+test('the daily check warns when the Twilio balance runs low', async () => {
+  await withFakeTwilio({ balance: '3.20' }, async (seen) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), TWILIO_ENV);
+    assert.equal(seen.mails.length, 1);
+    assert.match(seen.mails[0].text, /3\.20 USD/);
+  });
+});
+
+test('the daily check emails an alert when Twilio refuses the credentials', async () => {
+  await withFakeTwilio({ balanceStatus: 401 }, async (seen) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), TWILIO_ENV);
+    assert.equal(seen.mails.length, 1);
+    assert.match(seen.mails[0].text, /twilio 401/);
+  });
+});
+
+test('the daily check stays quiet with a healthy Twilio account', async () => {
+  await withFakeTwilio({}, async (seen) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), TWILIO_ENV);
+    assert.equal(seen.mails.length, 0);
+  });
+});

@@ -7,7 +7,7 @@ import { validateClientConfig } from '../core/config.mjs';
 import { calcom } from '../providers/calendar/calcom.mjs';
 import { google } from '../providers/calendar/google.mjs';
 import { resend } from '../providers/notify/resend.mjs';
-import { brevoSms } from '../providers/notify/brevo-sms.mjs';
+import { smsProvider } from '../providers/notify/sms.mjs';
 import { jsonFileStore, memoryStore } from '../db/store.mjs';
 
 let cached;
@@ -16,10 +16,11 @@ export async function buildDeps() {
   if (cached) return cached;
   const env = process.env;
 
-  const providers = { email: Boolean(env.RESEND_API_KEY), sms: Boolean(env.BREVO_API_KEY) };
+  const sms = smsProvider(env);
+  const providers = { email: Boolean(env.RESEND_API_KEY), sms: sms.adapter !== null };
   const { ok, errors, warnings, config } = validateClientConfig((await readClientConfig()) ?? envConfig(env), { providers });
   if (!ok) throw new Error(`invalid client config: ${errors.join('; ')}`);
-  for (const warning of warnings) console.warn('[open-receptionist]', warning);
+  for (const warning of [...sms.warnings, ...warnings]) console.warn('[open-receptionist]', warning);
 
   const calendar = config.calendar?.provider === 'google'
     ? google()
@@ -32,7 +33,7 @@ export async function buildDeps() {
 
   const notify = {};
   if (env.RESEND_API_KEY) notify.email = resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }).sendEmail;
-  if (env.BREVO_API_KEY) notify.sms = brevoSms({ apiKey: env.BREVO_API_KEY, sender: config.smsSender }).sendSms;
+  if (sms.adapter) notify.sms = sms.adapter.sendSms; // the handlers pass the validated sender with each SMS
 
   const store = env.DATA_FILE ? jsonFileStore(env.DATA_FILE) : memoryStore();
 

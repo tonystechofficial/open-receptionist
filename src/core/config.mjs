@@ -45,10 +45,13 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
     else sms.push(number);
   }
 
-  // Operators accept an alphanumeric sender of 3 to 11 characters; anything else is rejected at send time.
+  // Operators accept an alphanumeric sender of 3 to 11 characters, with at least one letter (digits
+  // alone read as a phone number); anything else is rejected at send time.
   const sender = cfg.smsSender == null ? null : String(cfg.smsSender);
   if (sender !== null && !/^[A-Za-z0-9]{3,11}$/.test(sender)) {
     errors.push('smsSender must be 3 to 11 letters or digits');
+  } else if (sender !== null && !/[A-Za-z]/.test(sender)) {
+    errors.push('smsSender needs at least one letter: digits alone read as a phone number');
   } else if (sender !== null && GENERIC_SENDERS.has(sender.toUpperCase())) {
     errors.push(`smsSender "${sender}" is too generic: carriers filter names like Info or Accueil, use the business's short name`);
   }

@@ -60,10 +60,16 @@ email optional.
 | Channel | Provider | Notes |
 |---|---|---|
 | Email | **Resend** (implemented) | Owner recap, required: the record of every call. Works from any IP, which matters for a Worker. |
-| SMS | **Brevo transactional SMS** (implemented) | Caller confirmation, to mobiles only, and owner recap. The sender is the business's short name, 3 to 11 letters or digits: there is no default, and generic names such as `Info` or `Accueil` are refused because carriers filter them. Texts are kept in the SMS alphabet so one message holds 160 characters. Brevo's IP blocking, on by default for new accounts, refuses a Worker, which has no fixed IP: turn it off. The daily check calls `GET /v3/account` with the key and reports a refusal or fewer than 20 credits. |
+| SMS | **Twilio** (implemented, used when `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are set) | Caller confirmation, to mobiles only, and owner recap. A form `POST /2010-04-01/Accounts/{sid}/Messages.json` with Basic auth, no IP allowlist. In France the alphanumeric sender needs no registration but a paid account. $0.0798 per SMS to France. The daily check reads `GET .../Balance.json` and reports refused credentials or a balance under 5. Checked on 2026-10-23. |
+| SMS | **Brevo transactional SMS** (implemented, used when only `BREVO_API_KEY` is set) | Same messages. Brevo's IP blocking, on by default for new accounts, refuses a Worker, which has no fixed IP: turn it off. The daily check calls `GET /v3/account` and reports a refusal or fewer than 20 credits. |
 
-Any other SMS provider only needs the same two functions: `sendSms({ to, content, sender })`, which
-throws when the provider refuses, and `check()`, which returns `{ smsCredits }` or throws.
+With either provider, the sender is the business's short name, 3 to 11 letters or digits with at
+least one letter: there is no default, and generic names such as `Info` or `Accueil` are refused
+because carriers filter them. Texts are kept in the SMS alphabet so one message holds 160 characters.
+`src/providers/notify/sms.mjs` picks the provider from the keys. Any other provider only needs the
+same two functions: `sendSms({ to, content, sender })`, which throws when the provider refuses, and
+`check()`, which throws on refused credentials and returns what `creditProblem` in
+`src/core/alerts.mjs` reads.
 
 ## Database (the source of truth)
 

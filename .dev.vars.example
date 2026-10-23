@@ -2,4 +2,7 @@
 WEBHOOK_SECRET=change-me
 CALCOM_API_KEY=
 RESEND_API_KEY=
-BREVO_API_KEY=
+# SMS through Twilio (both values), or through Brevo with BREVO_API_KEY instead:
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+# BREVO_API_KEY=

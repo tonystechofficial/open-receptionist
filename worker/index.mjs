@@ -4,16 +4,15 @@
 import { handleVapiMessage } from '../src/server/handlers.mjs';
 import { fallbackResponse } from '../src/server/fallback.mjs';
 import { validateClientConfig } from '../src/core/config.mjs';
-import { deliveryProblems, alertEmail } from '../src/core/alerts.mjs';
+import { deliveryProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
 import { calcom } from '../src/providers/calendar/calcom.mjs';
 import { resend } from '../src/providers/notify/resend.mjs';
-import { brevoSms } from '../src/providers/notify/brevo-sms.mjs';
+import { smsProvider } from '../src/providers/notify/sms.mjs';
 import { d1Store } from '../src/db/d1.mjs';
 
 // One endpoint for everything Vapi posts. The two older paths stay as aliases.
 const WEBHOOK_PATHS = new Set(['/api/vapi', '/api/tools', '/api/call-report']);
 const DAY_MS = 86_400_000;
-const LOW_SMS_CREDITS = 20; // about ten bookings: a confirmation and a recap each
 
 export function createWorker({ makeStore = (env) => d1Store(env.DB) } = {}) {
   return {
@@ -54,7 +53,8 @@ export function createWorker({ makeStore = (env) => d1Store(env.DB) } = {}) {
 export default createWorker();
 
 export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
-  const providers = { email: Boolean(env.RESEND_API_KEY), sms: Boolean(env.BREVO_API_KEY) };
+  const sms = smsProvider(env);
+  const providers = { email: Boolean(env.RESEND_API_KEY), sms: sms.adapter !== null };
   const { ok, errors, warnings, config } = validateClientConfig({
     company: env.CLIENT_COMPANY,
     metier: env.CLIENT_METIER,
@@ -76,15 +76,15 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
   });
   const notify = {};
   if (env.RESEND_API_KEY) notify.email = resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }).sendEmail;
-  if (env.BREVO_API_KEY) notify.sms = brevoSms({ apiKey: env.BREVO_API_KEY, sender: config.smsSender }).sendSms;
+  if (sms.adapter) notify.sms = sms.adapter.sendSms; // the handlers pass the validated sender with each SMS
 
   return { calendar, notify, store: makeStore(env), config, warnings };
 }
 
 /**
  * Everything that would keep a call from reaching the owner: a configuration the webhook refuses,
- * an SMS key Brevo refuses (its IP lock, on by default for new accounts, blocks a Worker), SMS
- * credits running out, and every delivery that failed in the last 24 hours.
+ * SMS credentials the provider refuses (Brevo's IP lock, on by default for new accounts, blocks a
+ * Worker), SMS credit running out, and every delivery that failed in the last 24 hours.
  */
 export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new Date()) {
   const problems = [];
@@ -96,17 +96,17 @@ export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new 
     problems.push(`Configuration refusée, chaque appel reçoit une promesse de rappel : ${error.message}`);
   }
 
-  if (env.BREVO_API_KEY) {
+  const sms = smsProvider(env);
+  problems.push(...sms.warnings.map((w) => `Configuration : ${w}`));
+  if (sms.adapter) {
     try {
-      const { smsCredits } = await brevoSms({ apiKey: env.BREVO_API_KEY }).check();
-      if (smsCredits !== null && smsCredits < LOW_SMS_CREDITS) {
-        problems.push(`Crédits SMS Brevo presque épuisés : ${smsCredits} restants.`);
-      }
+      const problem = creditProblem(sms.name, await sms.adapter.check());
+      if (problem) problems.push(problem);
     } catch (error) {
-      const hint = /IP address/i.test(error.message)
+      const hint = sms.name === 'brevo' && /IP address/i.test(error.message)
         ? ' Brevo bloque les adresses IP inconnues : dans Brevo, Sécurité > IP autorisées, désactiver le blocage.'
         : '';
-      problems.push(`Brevo refuse la clé SMS : ${clip(error.message)}.${hint}`);
+      problems.push(`Le fournisseur SMS (${sms.name}) refuse les identifiants : ${clip(error.message)}.${hint}`);
     }
   }
 

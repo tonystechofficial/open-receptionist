@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deliveryProblems, alertEmail } from '../src/core/alerts.mjs';
+import { deliveryProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
 
 const AT = '2026-10-23T08:00:00.000Z';
 const caller = { nom: 'Jean Dupont', telephone: '+33612345678' };
@@ -63,4 +63,17 @@ test('the alert email escapes what it quotes', () => {
   const mail = alertEmail({ company: 'Dupont', problems: ['<script>'] });
   assert.match(mail.subject, /1 problème\b/);
   assert.doesNotMatch(mail.html, /<script>/);
+});
+
+test('Brevo: fewer than 20 SMS credits left is a problem', () => {
+  assert.match(creditProblem('brevo', { smsCredits: 3 }), /crédits SMS[^\n]*\b3\b/i);
+  assert.equal(creditProblem('brevo', { smsCredits: 120 }), null);
+  assert.equal(creditProblem('brevo', { smsCredits: null }), null);
+});
+
+test('Twilio: a balance under 5 means the automatic recharge is not working', () => {
+  const p = creditProblem('twilio', { balance: 3.2, currency: 'USD' });
+  assert.match(p, /3\.20 USD/);
+  assert.match(p, /recharge/);
+  assert.equal(creditProblem('twilio', { balance: 25, currency: 'USD' }), null);
 });
