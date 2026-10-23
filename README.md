@@ -11,6 +11,9 @@ stack without touching the core.
 
 Maintained by Tony's Tech. MIT licensed.
 
+What the product must do, and must never do, is in [docs/SPEC.md](docs/SPEC.md): the target, the hard
+constraints on safety, cost, security and data, the non-goals, and when it counts as done.
+
 ## How it works
 
 ```

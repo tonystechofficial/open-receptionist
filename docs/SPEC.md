@@ -122,11 +122,9 @@ business's calendar or a call-back request delivered to the owner.
 
 ## Context
 
-- Product overview, costs and security model: [README](../../../../README.md).
-- Every call flow in plain words: [docs/FLOWS.md](../../../../docs/FLOWS.md); where the data lives:
-  [docs/DATA.md](../../../../docs/DATA.md); setting up a business:
-  [docs/SETUP.md](../../../../docs/SETUP.md); the swappable providers:
-  [docs/PROVIDERS.md](../../../../docs/PROVIDERS.md).
+- Product overview, costs and security model: [README](../README.md).
+- Every call flow in plain words: [FLOWS.md](FLOWS.md); where the data lives: [DATA.md](DATA.md);
+  setting up a business: [SETUP.md](SETUP.md); the swappable providers: [PROVIDERS.md](PROVIDERS.md).
 - Most of this contract is delivered as of 2026-10-24. Not delivered yet: the automatic deletion of
   old records, the immediate flood alert, and the protection against floods of unauthenticated
   requests.
