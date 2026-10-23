@@ -26,6 +26,27 @@ export function deliveryProblems(calls = []) {
   return problems;
 }
 
+const REPEAT_CALLS = 5; // from one number in 24 hours: more than a customer chasing an answer
+
+/** Calls that cost more than they should: cut at the time cap, or one number calling again and again. */
+export function callProblems(calls = []) {
+  const problems = [];
+  const byNumber = new Map();
+  for (const call of calls) {
+    if (call.endedReason === 'exceeded-max-duration') {
+      problems.push(`Appel de ${who(call)} (${call.callId}) : coupé à la durée maximale. Conversation qui tourne en rond, ou abus ?`);
+    }
+    const number = call.caller?.telephone;
+    if (number) byNumber.set(number, (byNumber.get(number) ?? 0) + 1);
+  }
+  for (const [number, count] of byNumber) {
+    if (count >= REPEAT_CALLS) {
+      problems.push(`Le ${formatPhoneFr(number)} a appelé ${count} fois en 24 heures : abus possible, chaque minute est facturée.`);
+    }
+  }
+  return problems;
+}
+
 const LOW_SMS_CREDITS = 20; // Brevo counts credits: about ten bookings, a confirmation and a recap each
 const LOW_BALANCE = 5; // Twilio counts money and recharges itself under 10 by default: below 5, it failed
 

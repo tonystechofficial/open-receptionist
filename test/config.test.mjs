@@ -133,3 +133,24 @@ test('an SMS sender made only of digits is refused: carriers read it as a phone 
   assert.ok(r.errors.some((e) => e.includes('smsSender')), r.errors.join('; '));
   assert.equal(validateClientConfig({ ...base, smsSender: 'Dupont33' }).ok, true);
 });
+
+test('the silence timeout defaults to 30 seconds', () => {
+  assert.equal(validateClientConfig(base).config.silenceTimeoutSeconds, 30);
+});
+
+test('a time cap over 30 minutes, or under one, is refused: a typo must not open the meter', () => {
+  for (const maxDurationSeconds of [43200, 30, 'long']) {
+    const r = validateClientConfig({ ...base, maxDurationSeconds });
+    assert.equal(r.ok, false, String(maxDurationSeconds));
+    assert.ok(r.errors.some((e) => e.includes('maxDurationSeconds')), String(maxDurationSeconds));
+  }
+  assert.equal(validateClientConfig({ ...base, maxDurationSeconds: 600 }).ok, true);
+});
+
+test('a silence timeout outside 10 to 120 seconds is refused', () => {
+  for (const silenceTimeoutSeconds of [3600, 5]) {
+    const r = validateClientConfig({ ...base, silenceTimeoutSeconds });
+    assert.equal(r.ok, false, String(silenceTimeoutSeconds));
+    assert.ok(r.errors.some((e) => e.includes('silenceTimeoutSeconds')), String(silenceTimeoutSeconds));
+  }
+});

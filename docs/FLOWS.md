@@ -121,8 +121,22 @@ demand. It reports a configuration the Worker would refuse, a missing provider k
 the provider refuses (Brevo's IP blocking, on by default for new accounts, refuses a Worker, which
 has no fixed IP), low SMS credit (a Twilio balance under 5, or fewer than 20 Brevo credits), and
 every SMS or recap that failed in the last 24 hours, as well as every ended call that never got a
-recap. When it finds something, it emails `ALERT_EMAIL`, or the first `NOTIFY_EMAIL`, with one line
-per problem.
+recap, every call cut at the time cap, and any number that called 5 times or more. When it finds
+something, it emails `ALERT_EMAIL`, or the first `NOTIFY_EMAIL`, with one line per problem.
+
+## 13. A long, silent or abusive call
+
+Every minute is billed, so three limits end a call that should end:
+
+- **The time cap.** Vapi cuts the call at `maxDurationSeconds`, 300 by default (the configuration
+  check accepts 60 to 1,800). The agent knows the cap from its prompt.
+- **Silence.** Vapi hangs up after `silenceTimeoutSeconds` without speech, 30 by default (10 to 120).
+- **The agent hangs up.** Once the caller has no more questions, the agent calls Vapi's `endCall`
+  tool, and `endCallMessage` says goodbye. It also hangs up on an abusive or prank call, or on an
+  off-topic conversation that goes on after its answer, but never during an emergency.
+
+The end-of-call report records Vapi's reason (`exceeded-max-duration`, `silence-timed-out`,
+`assistant-ended-call`, `customer-ended-call`) in `ended_reason`, which the daily check reads.
 
 ## Planned, not built
 

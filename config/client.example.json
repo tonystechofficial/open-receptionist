@@ -13,6 +13,7 @@
   "confirmation": { "sms": true },
   "voice": { "provider": "11labs", "voiceId": "REMPLACER_PAR_UNE_VOIX_FR" },
   "maxDurationSeconds": 300,
+  "silenceTimeoutSeconds": 30,
   "recordingEnabled": false,
   "urgences": "Odeur de gaz : demande à la personne de sortir tout de suite avec tout le monde, de ne toucher à aucun interrupteur ni appareil électrique, de ne pas allumer de flamme, de fermer le robinet de gaz si c'est possible sans risque, puis d'appeler depuis l'extérieur le dépannage gaz : le 05 56 79 41 00 de Régaz-Bordeaux si le logement est à Bordeaux ou dans une commune desservie par Régaz, sinon Urgence Sécurité Gaz au 0 800 47 33 33, gratuit ; tous deux répondent jour et nuit. En cas de doute sur le numéro, de malaise ou d'odeur très forte, le 112. Ne prends pas de rendez-vous avant d'avoir donné ces consignes. Fuite d'eau importante : conseille de fermer le robinet d'arrêt général du logement et, si l'eau approche des prises ou du tableau électrique, de couper le courant au disjoncteur."
 }

@@ -49,7 +49,7 @@ function systemPrompt(c) {
     `3. Demande le nom. Pour le rappel, si le numéro de l'appelant est connu, propose de le rappeler à ce numéro au lieu de le redemander. S'il en donne un autre, répète-le deux chiffres par deux chiffres pour vérifier, puis appelle noter_demande avec ce numéro.`,
     `4. S'il veut un rendez-vous, appelle verifier_dispos avec l'urgence, et avec le jour ou le moment de la journée qu'il souhaite s'il en a parlé. Propose au plus deux créneaux, en lisant les libellés exactement comme l'outil les donne.`,
     `5. Quand il choisit, appelle prendre_rdv avec le numéro de l'option choisie. Si l'outil répond que le créneau vient d'être pris, propose les nouveaux créneaux qu'il donne.`,
-    `6. Confirme le rendez-vous en une phrase, annonce le SMS de confirmation si l'outil le dit, demande s'il y a autre chose, puis conclus poliment.`,
+    `6. Confirme le rendez-vous en une phrase, annonce le SMS de confirmation si l'outil le dit, et demande s'il y a autre chose. S'il n'a plus de question, raccroche avec l'outil endCall, sans dire au revoir toi-même : le message de fin part tout seul.`,
     '',
     'CAS PARTICULIERS',
     `- Aucun créneau ne convient, ou l'outil n'en trouve pas : dis que ${c.company} le rappelle rapidement, vérifie son numéro et appelle noter_demande.`,
@@ -57,6 +57,8 @@ function systemPrompt(c) {
     `- Annulation ou changement d'un rendez-vous existant : tu ne peux pas le modifier toi-même. Note la demande avec noter_demande et dis que ${c.company} rappelle.`,
     `- Si un outil répond qu'il n'arrive pas à traiter la demande, ne réessaie pas en boucle : dis que ${c.company} rappelle et vérifie le numéro.`,
     `- Sujet sans rapport avec ${c.company} : dis poliment que tu ne peux pas aider sur ce point.`,
+    `- Appel abusif, canular ou insultes, ou sujet sans rapport qui continue après ta réponse : dis poliment que tu ne peux pas aider, puis raccroche avec endCall.`,
+    `- Ne raccroche jamais pendant une urgence, ni tant que l'appelant pose une question sur ${c.company}.`,
   ];
   if (c.urgences) {
     lines.push('', "CONSIGNES DE SÉCURITÉ (à donner en premier, avant tout le reste, si la situation correspond)", String(c.urgences).trim());
@@ -118,13 +120,17 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
         email: { type: 'string' },
       },
     }),
+    // Vapi's built-in Hang Up tool: the agent ends a finished or abusive call instead of leaving the
+    // line open until the caller hangs up. Without messages of its own, it says endCallMessage.
+    { type: 'endCall' },
   ];
 
   return {
     name: `${c.company} - accueil`.slice(0, 40), // Vapi rejects names over 40 characters
     firstMessage: `Bonjour, vous êtes bien chez ${c.company}. Je suis l'assistant vocal de l'entreprise, une intelligence artificielle. Que puis-je faire pour vous ?`,
     firstMessageMode: 'assistant-speaks-first',
-    maxDurationSeconds: c.maxDurationSeconds ?? 300,
+    maxDurationSeconds: c.maxDurationSeconds ?? 300, // hard cap: the call is cut, whatever happens
+    silenceTimeoutSeconds: c.silenceTimeoutSeconds ?? 30, // ends a call left open in silence
     endCallMessage: 'Merci pour votre appel, je vous souhaite une bonne journée.',
     artifactPlan: { recordingEnabled: !!c.recordingEnabled },
     transcriber: { provider: 'deepgram', model: 'nova-3', language: c.language ?? 'fr' },

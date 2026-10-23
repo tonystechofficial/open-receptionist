@@ -17,7 +17,7 @@ Plan about three hours of work, plus one to three days for the French number's r
 | Cal.com | free plan, or self-hosted |
 | Resend, for the email recap | free tier |
 | A French phone number from Twilio | about $1.35 a month |
-| Vapi calls, speech, model and voice included | about $0.10 to $0.30 a minute |
+| Vapi calls, with speech-to-text, gpt-4o-mini, an ElevenLabs voice and Twilio's incoming minutes | about $0.10 a minute; detail per item and per business in the [README](../README.md#what-it-costs-to-run) |
 | SMS through Twilio | $0.0798 per SMS to France; Brevo, the alternative, from €0.045 |
 
 Prices checked in October 2026. Check them again before quoting a client.
@@ -134,7 +134,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 144 tests, nothing to install
+npm test        # 154 tests, nothing to install
 ```
 
 ## 3. Database and Worker

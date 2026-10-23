@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deliveryProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
+import { deliveryProblems, alertEmail, creditProblem, callProblems } from '../src/core/alerts.mjs';
 
 const AT = '2026-10-23T08:00:00.000Z';
 const caller = { nom: 'Jean Dupont', telephone: '+33612345678' };
@@ -76,4 +76,28 @@ test('Twilio: a balance under 5 means the automatic recharge is not working', ()
   assert.match(p, /3\.20 USD/);
   assert.match(p, /recharge/);
   assert.equal(creditProblem('twilio', { balance: 25, currency: 'USD' }), null);
+});
+
+test('a call cut at the time cap is reported', () => {
+  const problems = callProblems([{ callId: 'call_5', caller, endedAt: AT, endedReason: 'exceeded-max-duration' }]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /call_5/);
+  assert.match(problems[0], /durée maximale/);
+});
+
+test('a number calling five times or more is reported once, with the count', () => {
+  const calls = Array.from({ length: 6 }, (_, i) => ({ callId: `c${i}`, caller, endedAt: AT, endedReason: 'customer-ended-call' }));
+  const problems = callProblems(calls);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /06 12 34 56 78/);
+  assert.match(problems[0], /6 fois/);
+});
+
+test('ordinary calls are not problems', () => {
+  const calls = [
+    { callId: 'a', caller, endedAt: AT, endedReason: 'customer-ended-call' },
+    { callId: 'b', caller, endedAt: AT, endedReason: 'assistant-ended-call' },
+    { callId: 'c', caller: null, endedAt: AT, endedReason: 'silence-timed-out' },
+  ];
+  assert.deepEqual(callProblems(calls), []);
 });

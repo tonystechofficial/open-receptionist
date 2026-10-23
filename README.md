@@ -56,7 +56,7 @@ A new client is a new config, not new code. See `config/client.example.json`:
 ## Quickstart
 
 ```bash
-npm test     # 144 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 154 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -112,6 +112,64 @@ Then on Vapi:
 **Vercel instead:** `api/vapi.mjs` serves the same flows as a Node function. Set the env from
 `.env.example`, use the JSON-file store or a hosted database, and `vercel --prod`.
 
+## What it costs to run
+
+About **$0.10 per minute of call**, all included. Prices checked in October 2026, excluding VAT:
+
+| Item | Price |
+|---|---|
+| Vapi hosting | $0.05 a minute |
+| ElevenLabs voice, through Vapi (no ElevenLabs subscription) | $0.015 to $0.024 a minute |
+| Twilio, incoming call on a French number | $0.010 a minute |
+| Deepgram speech-to-text, through Vapi | about $0.010 a minute |
+| gpt-4o-mini, through Vapi | about $0.008 a minute |
+| Twilio French number | $1.35 a month |
+| Twilio SMS to France | $0.0798 each |
+| Cloudflare Workers and D1, Cal.com, Resend (up to 3,000 emails a month) | free |
+
+Per business and per month, with 2-minute calls and a confirmation SMS for each booking:
+
+| | Small | Typical | Busy |
+|---|---|---|---|
+| Calls / minutes | 60 / 120 | 150 / 300 | 400 / 800 |
+| Bookings, so confirmation SMS | 40 | 100 | 250 |
+| **Total** | **about $17** | **about $40** | **about $101** |
+
+An SMS recap to the owner after every call adds $0.08 a call. Shared by every business on the same
+accounts: Vapi's simultaneous calls (4 on pay-as-you-go, 10 with Core at $29 a month, $10 per extra
+line), Resend past 3,000 emails a month or 100 a day ($20 a month), and an ElevenLabs plan, needed only
+for a cloned voice on your own key. Sources: [Vapi](https://vapi.ai/pricing),
+[ElevenLabs](https://elevenlabs.io/pricing/api), [Deepgram](https://deepgram.com/pricing),
+[Twilio voice](https://www.twilio.com/en-us/voice/pricing/fr),
+[Twilio SMS](https://www.twilio.com/en-us/sms/pricing/fr), [Resend](https://resend.com/pricing).
+
+## Security and limits
+
+**Call length, so cost:**
+
+- Every call is cut at **5 minutes** (`maxDurationSeconds`) and after **30 seconds of silence**
+  (`silenceTimeoutSeconds`). A client can lower both; the configuration check refuses a cap over 30
+  minutes or a silence timeout over 2 minutes, so a typo cannot leave the meter running.
+- The agent **hangs up by itself** (Vapi's `endCall` tool) once the caller has no more questions, or
+  on an abusive or prank call. It never hangs up during an emergency.
+- Vapi runs **at most 4 calls at once** on pay-as-you-go (10 with Core): a flood of calls costs at
+  most that many minutes at a time.
+- The **daily check** reports every call cut at the time cap and any number that called 5 times or
+  more in 24 hours. Also set a spending alert in Vapi; the check already warns when the Twilio balance
+  falls under 5.
+
+**The webhook:**
+
+- Every call to `/api/vapi` must carry the shared secret (`X-Vapi-Secret`, sent by a Vapi credential),
+  or it gets a 401. `/api/check` needs the same secret; `/health` only answers `{"ok":true}`.
+- The keys are Cloudflare secrets: never in the repository, never in a browser.
+
+**What a caller can make the agent do:**
+
+- Three tools only: note a request, read two free slots, book one. It cannot cancel or move a booking,
+  read other customers' data, or text anyone but the caller (once, after a booking) and the owner.
+- Everything the caller says is a request, never an instruction, and the prompt holds no secret.
+
 ## Data and privacy
 
 Records live in **your** database; the voice platform is told to keep only metadata. Full detail in
@@ -127,8 +185,8 @@ Records live in **your** database; the voice platform is told to keep only metad
 ## Status
 
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
-  real SQLite, the Twilio and Brevo adapters, and the Worker's routing, authentication, fallback and
-  daily check (144 tests).
+  real SQLite, the Twilio and Brevo adapters, the call limits, and the Worker's routing,
+  authentication, fallback and daily check (154 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

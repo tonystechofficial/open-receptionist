@@ -4,7 +4,7 @@
 import { handleVapiMessage } from '../src/server/handlers.mjs';
 import { fallbackResponse } from '../src/server/fallback.mjs';
 import { validateClientConfig } from '../src/core/config.mjs';
-import { deliveryProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
+import { deliveryProblems, callProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
 import { calcom } from '../src/providers/calendar/calcom.mjs';
 import { resend } from '../src/providers/notify/resend.mjs';
 import { smsProvider } from '../src/providers/notify/sms.mjs';
@@ -112,7 +112,8 @@ export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new 
 
   try {
     const store = deps?.store ?? makeStore(env);
-    problems.push(...deliveryProblems(await store.callsUpdatedSince(new Date(now.getTime() - DAY_MS).toISOString())));
+    const recent = await store.callsUpdatedSince(new Date(now.getTime() - DAY_MS).toISOString());
+    problems.push(...deliveryProblems(recent), ...callProblems(recent));
   } catch (error) {
     problems.push(`Base de données illisible : ${clip(error.message)}`);
   }

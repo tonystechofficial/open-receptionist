@@ -215,3 +215,18 @@ test('the daily check stays quiet with a healthy Twilio account', async () => {
     assert.equal(seen.mails.length, 0);
   });
 });
+
+test('the daily check reports a call cut at the time cap', async () => {
+  await withFakeApis({}, async (mails) => {
+    const store = memoryStore();
+    await store.upsertCall('call_long', {
+      caller: { nom: 'Paul', telephone: '+33612345678' }, endedAt: new Date().toISOString(),
+      endedReason: 'exceeded-max-duration', recapSentAt: new Date().toISOString(),
+      deliveries: { recap: { email: { status: 'sent' }, sms: [] } },
+    });
+    await runScheduled(createWorker({ makeStore: () => store }), CHECK_ENV);
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].text, /call_long/);
+    assert.match(mails[0].text, /durée maximale/);
+  });
+});

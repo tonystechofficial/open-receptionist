@@ -6,6 +6,7 @@ const DEFAULTS = {
   timeZone: 'Europe/Paris',
   recordingEnabled: false, // off by default; see docs/DATA.md
   maxDurationSeconds: 300, // qualifying, choosing a slot and confirming can run past 3 minutes
+  silenceTimeoutSeconds: 30, // hang up after this long without speech; Vapi does not document its default
   voice: { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' },
   confirmation: { sms: true }, // SMS the caller once the appointment is booked
 };
@@ -54,6 +55,16 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
     errors.push('smsSender needs at least one letter: digits alone read as a phone number');
   } else if (sender !== null && GENERIC_SENDERS.has(sender.toUpperCase())) {
     errors.push(`smsSender "${sender}" is too generic: carriers filter names like Info or Accueil, use the business's short name`);
+  }
+
+  // Every minute is billed: the limits on call length stay within sane bounds, so a typo cannot
+  // leave a silent or looping call running for hours (Vapi accepts up to 12 hours).
+  const between = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
+  if (cfg.maxDurationSeconds != null && !between(cfg.maxDurationSeconds, 60, 1800)) {
+    errors.push('maxDurationSeconds must be a whole number of seconds from 60 to 1800 (30 minutes)');
+  }
+  if (cfg.silenceTimeoutSeconds != null && !between(cfg.silenceTimeoutSeconds, 10, 120)) {
+    errors.push('silenceTimeoutSeconds must be a whole number of seconds from 10 to 120');
   }
 
   if (providers) {
