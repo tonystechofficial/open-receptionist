@@ -59,7 +59,9 @@ business's calendar or a call-back request delivered to the owner.
   a request noted, hear free slots, and book one: no cancellation, no change to another booking, no
   access to anyone else's data, and nothing that moves money.
 - A flood of unauthenticated requests to the public endpoints does not stop real calls from being
-  answered. TBD: what flood (requests per minute) must the service withstand while still answering?
+  answered. Recommended bound: one source sending junk requests nonstop, 10 a second for a whole day,
+  is cut off before the service does any work; a large attack from many sources is left to the
+  hosting provider's own protection.
 - When call screening or a provider fails, the call is still answered rather than lost.
 
 **Data**
@@ -68,8 +70,9 @@ business's calendar or a call-back request delivered to the owner.
   controls. The voice platform keeps no recording and no transcript.
 - Recording is off by default. If a business turns it on, every caller is told at the start of the
   call, as the CNIL requires.
-- Records older than the business's retention period are deleted automatically. TBD: is 12 months the
-  default retention period, or must each business set its own?
+- Records older than the business's retention period are deleted automatically, every day. Recommended
+  period: 12 months by default, adjustable per business; never shorter than the business needs to
+  call its customers back, never kept longer without a reason the business can state.
 
 **Operation**
 
@@ -79,7 +82,8 @@ business's calendar or a call-back request delivered to the owner.
   refused credentials, low messaging credit, failed messages, calls cut at the time cap, numbers
   calling 5 times or more, and calls turned away. No report is sent when nothing is wrong.
 - When callers start being turned away for the hourly total or the withheld-number limit, the
-  operator is alerted without waiting for the daily report. TBD: within how many minutes?
+  operator is alerted without waiting for the daily report. Recommended: within 5 minutes of the
+  first call turned away, and at most once an hour for the same wave.
 
 ## Non-goals
 
@@ -90,11 +94,15 @@ business's calendar or a call-back request delivered to the owner.
   European Union.
 - Replacing the business's calendar or customer database: the receptionist books into the calendar
   the business already uses.
-- TBD: is moving or cancelling an existing booking by voice in scope? Today the receptionist records
-  a call-back request instead.
-- TBD: does the owner need a dashboard of calls and appointments, or are the email recaps enough?
-- TBD: does one deployment serve one business only, or several businesses each with its own
-  configuration and data?
+- Moving or cancelling an existing booking by voice (recommended out of scope): a voice cannot prove
+  who is calling, so a caller giving someone else's name could cancel that person's appointment. The
+  receptionist records a call-back request, and the business makes the change.
+- An owner dashboard of calls and appointments (recommended out of scope for now): the email recap
+  after each call and the daily report already show the owner and the operator what happened, and a
+  dashboard adds a login and personal data to protect.
+- Several businesses in one deployment (recommended out of scope for now): one deployment per business
+  keeps each business's callers, data and keys apart. Serving several from one deployment needs that
+  separation built and tested first.
 
 ## Done-when
 
@@ -109,7 +117,8 @@ business's calendar or a call-back request delivered to the owner.
 - No call goes past 5 minutes, and a silent line closes after 30 seconds.
 - A failed message, a refused credential, low credit, a call cut at the time cap and every turned-away
   call appear in the operator's next daily report; a wave of turned-away calls also alerts the
-  operator within the agreed delay.
+  operator within 5 minutes.
+- A source sending junk requests nonstop is cut off, and real calls keep being answered meanwhile.
 - A request without a valid secret or signature changes nothing and triggers no provider call.
 - A record older than the retention period is no longer in the database the day after it expires.
 
@@ -122,6 +131,9 @@ business's calendar or a call-back request delivered to the owner.
 
 ## Context
 
+- Answers marked **recommended** are the maintainer's proposals on six open questions (request
+  flood, retention, flood alert, voice changes to bookings, dashboard, several businesses), written on
+  2026-10-24 for the decider to confirm or change.
 - Product overview, costs and security model: [README](../README.md).
 - Every call flow in plain words: [FLOWS.md](FLOWS.md); where the data lives: [DATA.md](DATA.md);
   setting up a business: [SETUP.md](SETUP.md); the swappable providers: [PROVIDERS.md](PROVIDERS.md).
