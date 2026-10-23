@@ -58,6 +58,9 @@ npm test     # 88 tests: core, flows, D1 SQL on SQLite, Worker routing. No depen
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
 
+For a production setup from zero, accounts and compliance included, follow
+[docs/SETUP.md](docs/SETUP.md). The short version:
+
 ```bash
 npx wrangler login
 npx wrangler d1 create open-receptionist --location weur   # paste the id into wrangler.toml
