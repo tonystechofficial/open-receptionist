@@ -64,18 +64,33 @@ npm test     # 144 tests: core, flows, D1 SQL on SQLite, Worker routing and dail
 For a production setup from zero, accounts and compliance included, follow
 [docs/SETUP.md](docs/SETUP.md). The short version:
 
+**Accounts first:** Cloudflare (free), Cal.com, Vapi, Resend with a verified sending domain, and
+Twilio **upgraded out of the trial** with automatic recharge on. A trial account cannot send SMS under
+the business's name and only texts verified numbers.
+
 ```bash
 npx wrangler login
 npx wrangler d1 create open-receptionist --location weur   # paste the id into wrangler.toml
-npm run db:init                                            # applies migrations/
+npm run db:init                                            # applies every file in migrations/
 npx wrangler secret put WEBHOOK_SECRET
 npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio; or BREVO_API_KEY for Brevo
 npx wrangler secret put TWILIO_AUTH_TOKEN
-# edit the [vars] block in wrangler.toml: company, métier, phone, recipients, Cal.com event type
+# edit the [vars] block in wrangler.toml: company, métier, phone, recipients (an email is required),
+# Cal.com event type, SMS_SENDER (the business's short name) and ALERT_EMAIL (you)
 npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev
+curl https://open-receptionist.<you>.workers.dev/health    # {"ok":true}
+curl -H "x-vapi-secret: <WEBHOOK_SECRET>" https://open-receptionist.<you>.workers.dev/api/check
+# {"ok":true,"problems":[]}  -- otherwise each problem is spelled out
 ```
+
+The deploy also schedules the **daily check** (`[triggers]` in `wrangler.toml`, 06:00 UTC): it emails
+`ALERT_EMAIL` when the configuration, a provider key, the SMS credit or a message sent in the last
+24 hours has a problem.
+
+To **update** a running deployment: `git pull`, `npm test`, `npm run db:init` (applies any new
+migration, such as `0002_deliveries.sql`), then `npm run deploy`.
 
 Then on Vapi:
 
@@ -87,8 +102,9 @@ Then on Vapi:
    WEBHOOK_BASE_URL=https://open-receptionist.<you>.workers.dev \
      node vapi/create-assistant.mjs config/client.json
    ```
-3. Attach a phone number to the assistant. A French `+33` number needs a Twilio or Telnyx regulatory
-   bundle (identity and a French address), which takes a day or two; start on the number Vapi gives you.
+3. Attach a phone number to the assistant. Buy the French `+33` number at Twilio, so one account
+   carries the number and the SMS. It needs a regulatory bundle (identity and a French address), which
+   takes a day or two; start on the number Vapi gives you, then import the Twilio number into Vapi.
 4. In Cal.com, make the event type's **phone number required and email optional**, so callers who only
    give a number can be booked.
 5. Run the **first real call checklist** at the end of [docs/FLOWS.md](docs/FLOWS.md).
