@@ -38,9 +38,23 @@ CREATE TABLE IF NOT EXISTS appointments (
   created_at  TEXT NOT NULL
 );
 
+-- Every incoming call the screen saw, before anything answered it (Twilio webhook or Vapi
+-- assistant-request). The limits count the allowed ones; the daily check sums up the refused ones.
+CREATE TABLE IF NOT EXISTS call_attempts (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  number           TEXT,                  -- E.164; NULL when the number is withheld
+  at               TEXT NOT NULL,         -- UTC ISO
+  decision         TEXT NOT NULL,         -- allowed | refused
+  reason           TEXT,                  -- blocked | total | anonymous | number-hour | number-day | no-assistant
+  via              TEXT NOT NULL,         -- twilio | vapi
+  provider_call_id TEXT                   -- Twilio's CallSid or Vapi's call id
+);
+
 CREATE INDEX IF NOT EXISTS appointments_by_call ON appointments (call_id);
 CREATE INDEX IF NOT EXISTS calls_by_created ON calls (created_at);
 CREATE INDEX IF NOT EXISTS calls_by_updated ON calls (updated_at); -- the daily check reads the last 24 hours
+CREATE INDEX IF NOT EXISTS call_attempts_by_number ON call_attempts (number, at);
+CREATE INDEX IF NOT EXISTS call_attempts_by_at ON call_attempts (at);
 
 -- calls.deliveries holds the caller's confirmation SMS and the owner's recap by email and by SMS,
 -- each sent, failed with the provider's message, or skipped with the reason. For example

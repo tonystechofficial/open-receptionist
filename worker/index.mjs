@@ -4,10 +4,15 @@
 import { handleVapiMessage } from '../src/server/handlers.mjs';
 import { fallbackResponse } from '../src/server/fallback.mjs';
 import { validateClientConfig } from '../src/core/config.mjs';
-import { deliveryProblems, callProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
+import { deliveryProblems, callProblems, screeningProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
+import { blockedNumbers, screeningLimits } from '../src/core/screening.mjs';
+import { normalizePhone } from '../src/core/phone.mjs';
+import { screenIncoming } from '../src/server/screening.mjs';
+import { safeEqual } from '../src/server/secrets.mjs';
 import { calcom } from '../src/providers/calendar/calcom.mjs';
 import { resend } from '../src/providers/notify/resend.mjs';
 import { smsProvider } from '../src/providers/notify/sms.mjs';
+import { verifyTwilioSignature, twimlForward, twimlReject, twimlSayAndHangUp } from '../src/providers/telephony/twilio-voice.mjs';
 import { d1Store } from '../src/db/d1.mjs';
 
 // One endpoint for everything Vapi posts. The two older paths stay as aliases.
@@ -22,23 +27,31 @@ export function createWorker({ makeStore = (env) => d1Store(env.DB) } = {}) {
       // The daily check on demand, to verify a setup: same secret as the webhook, nothing is emailed.
       if (url.pathname === '/api/check') {
         if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
-        if (!env.WEBHOOK_SECRET || request.headers.get('x-vapi-secret') !== env.WEBHOOK_SECRET) {
+        if (!safeEqual(request.headers.get('x-vapi-secret'), env.WEBHOOK_SECRET)) {
           return json({ error: 'bad secret' }, 401);
         }
         return json(await runCheck(env, makeStore));
       }
+      // Call screening, method 1: Twilio posts each incoming call here before Vapi sees it.
+      if (url.pathname === '/api/twilio/voice') {
+        if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+        return twilioVoice(request, env, makeStore);
+      }
       if (!WEBHOOK_PATHS.has(url.pathname)) return json({ error: 'not found' }, 404);
       if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405);
-      if (env.WEBHOOK_SECRET && request.headers.get('x-vapi-secret') !== env.WEBHOOK_SECRET) {
+      if (env.WEBHOOK_SECRET && !safeEqual(request.headers.get('x-vapi-secret'), env.WEBHOOK_SECRET)) {
         return json({ error: 'bad secret' }, 401);
       }
 
       const body = await request.json().catch(() => ({}));
       const message = body?.message ?? body;
+      if (message && !message.call && body?.call) message.call = body.call; // where Vapi's example puts it
       try {
         return json(await handleVapiMessage(message, buildDeps(env, makeStore)));
       } catch (error) {
         console.error('[open-receptionist]', error);
+        // A broken screen must not lose a real call: route it to the assistant anyway.
+        if (message?.type === 'assistant-request' && env.VAPI_ASSISTANT_ID) return json({ assistantId: env.VAPI_ASSISTANT_ID });
         return json(fallbackResponse(message)); // still a 200: Vapi ignores tool results on other codes
       }
     },
@@ -62,6 +75,7 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
     telephone: env.CLIENT_TELEPHONE || undefined,
     timeZone: env.TIME_ZONE || undefined,
     smsSender: env.SMS_SENDER || undefined,
+    smsCountries: splitList(env.SMS_COUNTRIES),
     confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
     calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
     notify: { email: splitList(env.NOTIFY_EMAIL), sms: splitList(env.NOTIFY_SMS) },
@@ -78,7 +92,39 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
   if (env.RESEND_API_KEY) notify.email = resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }).sendEmail;
   if (sms.adapter) notify.sms = sms.adapter.sendSms; // the handlers pass the validated sender with each SMS
 
-  return { calendar, notify, store: makeStore(env), config, warnings };
+  const screening = {
+    assistantId: env.VAPI_ASSISTANT_ID || undefined,
+    blocked: blockedNumbers(env.BLOCKED_NUMBERS),
+    limits: screeningLimits(env),
+  };
+  return { calendar, notify, store: makeStore(env), config, warnings, screening };
+}
+
+/**
+ * Method 1 of call screening. Only a request signed with the account's Auth Token is read; a refused
+ * call is rejected (blocked number) or told why in one sentence, and never reaches Vapi.
+ */
+async function twilioVoice(request, env, makeStore) {
+  const params = Object.fromEntries(new URLSearchParams(await request.text()));
+  const signed = await verifyTwilioSignature({
+    url: request.url, params, signature: request.headers.get('x-twilio-signature'), authToken: env.TWILIO_AUTH_TOKEN,
+  });
+  if (!signed) return new Response('forbidden', { status: 403 });
+
+  const forward = twimlForward(env.VAPI_TWILIO_INBOUND_URL || undefined);
+  try {
+    const call = { number: normalizePhone(params.From), via: 'twilio', providerCallId: params.CallSid };
+    const verdict = await screenIncoming(call, buildDeps(env, makeStore));
+    if (verdict.allow) return twiml(forward);
+    return twiml(verdict.reason === 'blocked' ? twimlReject() : twimlSayAndHangUp(verdict.message));
+  } catch (error) {
+    console.error('[open-receptionist] screening failed, call let through', error);
+    return twiml(forward); // a broken screen must not lose a real call
+  }
+}
+
+function twiml(body) {
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/xml' } });
 }
 
 /**
@@ -112,8 +158,9 @@ export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new 
 
   try {
     const store = deps?.store ?? makeStore(env);
-    const recent = await store.callsUpdatedSince(new Date(now.getTime() - DAY_MS).toISOString());
-    problems.push(...deliveryProblems(recent), ...callProblems(recent));
+    const dayAgo = new Date(now.getTime() - DAY_MS).toISOString();
+    const recent = await store.callsUpdatedSince(dayAgo);
+    problems.push(...deliveryProblems(recent), ...callProblems(recent), ...screeningProblems(await store.attemptsSince(dayAgo)));
   } catch (error) {
     problems.push(`Base de données illisible : ${clip(error.message)}`);
   }

@@ -56,7 +56,7 @@ A new client is a new config, not new code. See `config/client.example.json`:
 ## Quickstart
 
 ```bash
-npm test     # 154 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 187 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -154,14 +154,32 @@ for a cloned voice on your own key. Sources: [Vapi](https://vapi.ai/pricing),
   on an abusive or prank call. It never hangs up during an emergency.
 - Vapi runs **at most 4 calls at once** on pay-as-you-go (10 with Core): a flood of calls costs at
   most that many minutes at a time.
-- The **daily check** reports every call cut at the time cap and any number that called 5 times or
-  more in 24 hours. Also set a spending alert in Vapi; the check already warns when the Twilio balance
-  falls under 5.
+- The **daily check** reports every call cut at the time cap, any number that called 5 times or more
+  in 24 hours, and the calls the screen refused.
 
-**The webhook:**
+**Call screening, before anything answers** ([SETUP, step 5.4](docs/SETUP.md#54-screen-incoming-calls)):
+
+- A number in `BLOCKED_NUMBERS`, a number already let through 4 times this hour or 8 times today, more
+  than 5 withheld numbers in the hour, or more than 30 calls in the hour in total is turned away. A
+  refused caller always hears how to reach help in an emergency (112).
+- **Method 1, number at Twilio:** Twilio asks the Worker first (`/api/twilio/voice`, signature checked
+  with the account's Auth Token). A blocked number is rejected without being answered, so nobody
+  bills it; a limited caller hears one sentence; Vapi never sees either. Allowed calls go on to Vapi.
+- **Method 2, any number:** Vapi asks the Worker which assistant answers (`assistant-request`); a
+  refused caller hears the reason in a few billed seconds.
+- If the screen itself breaks, calls are let through rather than lost.
+
+**SMS:**
+
+- Confirmations go only to mobiles in the countries listed in `SMS_COUNTRIES`, France by default. A
+  caller can dictate any number, and SMS to some countries cost many times the French rate (SMS
+  pumping fraud): a dictated foreign number gets no SMS.
+
+**The webhooks:**
 
 - Every call to `/api/vapi` must carry the shared secret (`X-Vapi-Secret`, sent by a Vapi credential),
-  or it gets a 401. `/api/check` needs the same secret; `/health` only answers `{"ok":true}`.
+  or it gets a 401; `/api/twilio/voice` must carry Twilio's signature, or it gets a 403. Both are
+  compared in constant time. `/api/check` needs the secret; `/health` only answers `{"ok":true}`.
 - The keys are Cloudflare secrets: never in the repository, never in a browser.
 
 **What a caller can make the agent do:**
@@ -169,6 +187,21 @@ for a cloned voice on your own key. Sources: [Vapi](https://vapi.ai/pricing),
 - Three tools only: note a request, read two free slots, book one. It cannot cancel or move a booking,
   read other customers' data, or text anyone but the caller (once, after a booking) and the owner.
 - Everything the caller says is a request, never an instruction, and the prompt holds no secret.
+
+**In the providers' dashboards** (settings, not code):
+
+- **Vapi:** keep the balance prepaid with auto-reload off or capped, so a flood cannot spend more than
+  the credit, and do not buy concurrency lines you do not need.
+- **Twilio:** cap the automatic recharge; in Voice geographic permissions turn **off** every outbound
+  destination (the receptionist never calls out, and leaked keys could otherwise run up international
+  calls); in Messaging geographic permissions allow **France only**; add a usage trigger that emails
+  you past a daily amount.
+- **Every account** (Cloudflare, Vapi, Twilio, Cal.com, Resend, GitHub): two-factor authentication.
+  Keys with the least rights: a Resend key limited to sending, a Cloudflare token limited to the
+  Worker and D1.
+
+**Not built yet:** a Cloudflare rate-limiting rule in front of the Worker's routes, and the automatic
+deletion of old rows (retention is applied by hand, see SETUP step 7).
 
 ## Data and privacy
 
@@ -185,8 +218,8 @@ Records live in **your** database; the voice platform is told to keep only metad
 ## Status
 
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
-  real SQLite, the Twilio and Brevo adapters, the call limits, and the Worker's routing,
-  authentication, fallback and daily check (154 tests).
+  real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, and the
+  Worker's routing, authentication, fallback and daily check (187 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

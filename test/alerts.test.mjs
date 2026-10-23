@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deliveryProblems, alertEmail, creditProblem, callProblems } from '../src/core/alerts.mjs';
+import { deliveryProblems, alertEmail, creditProblem, callProblems, screeningProblems } from '../src/core/alerts.mjs';
 
 const AT = '2026-10-23T08:00:00.000Z';
 const caller = { nom: 'Jean Dupont', telephone: '+33612345678' };
@@ -100,4 +100,22 @@ test('ordinary calls are not problems', () => {
     { callId: 'c', caller: null, endedAt: AT, endedReason: 'silence-timed-out' },
   ];
   assert.deepEqual(callProblems(calls), []);
+});
+
+test('refused calls are summed up per number and reason, one line each', () => {
+  const refused = (number, reason) => ({ number, at: AT, decision: 'refused', reason, via: 'twilio' });
+  const problems = screeningProblems([
+    refused('+33612345678', 'number-hour'), refused('+33612345678', 'number-hour'), refused('+33612345678', 'number-hour'),
+    refused(null, 'anonymous'), refused(null, 'anonymous'),
+    { number: '+33700000000', at: AT, decision: 'allowed', reason: null, via: 'twilio' },
+  ]);
+  assert.equal(problems.length, 2, problems.join('\n'));
+  assert.ok(problems.some((p) => p.includes('06 12 34 56 78') && p.includes('3')), problems.join('\n'));
+  assert.ok(problems.some((p) => /masqu/.test(p) && p.includes('2')), problems.join('\n'));
+});
+
+test('a call that could not be routed for lack of VAPI_ASSISTANT_ID is a configuration problem', () => {
+  const problems = screeningProblems([{ number: '+33612345678', at: AT, decision: 'refused', reason: 'no-assistant', via: 'vapi' }]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /VAPI_ASSISTANT_ID/);
 });

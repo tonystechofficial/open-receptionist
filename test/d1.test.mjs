@@ -129,3 +129,20 @@ test('the daily check reads only the calls updated since a given instant', { ski
   assert.deepEqual((await store.callsUpdatedSince(before)).map((c) => c.callId), ['c4']);
   assert.deepEqual(await store.callsUpdatedSince(new Date(Date.now() + 60_000).toISOString()), []);
 });
+
+test('call attempts are counted per number, for withheld numbers and in total, allowed ones only', { skip }, async () => {
+  const store = d1Store(await d1Binding());
+  const now = new Date('2026-10-24T10:00:00Z');
+  const at = (minutesAgo) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
+  const me = '+33612345678';
+  await store.recordAttempt({ number: me, at: at(10), decision: 'allowed', reason: null, via: 'twilio', providerCallId: 'CA1' });
+  await store.recordAttempt({ number: me, at: at(120), decision: 'allowed', reason: null, via: 'twilio', providerCallId: 'CA2' });
+  await store.recordAttempt({ number: me, at: at(5), decision: 'refused', reason: 'number-hour', via: 'twilio', providerCallId: 'CA3' });
+  await store.recordAttempt({ number: null, at: at(20), decision: 'allowed', reason: null, via: 'vapi', providerCallId: 'c4' });
+  await store.recordAttempt({ number: '+33700000000', at: at(30), decision: 'allowed', reason: null, via: 'vapi', providerCallId: 'c5' });
+  assert.deepEqual(await store.attemptCounts({ number: me, now }), { numberHour: 1, numberDay: 2, anonymousHour: 1, totalHour: 3 });
+  assert.deepEqual(await store.attemptCounts({ number: null, now }), { numberHour: 0, numberDay: 0, anonymousHour: 1, totalHour: 3 });
+  const since = await store.attemptsSince(at(60));
+  assert.deepEqual(since.map((a) => a.providerCallId), ['c5', 'c4', 'CA1', 'CA3']);
+  assert.equal(since[3].reason, 'number-hour');
+});

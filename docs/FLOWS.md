@@ -121,8 +121,9 @@ demand. It reports a configuration the Worker would refuse, a missing provider k
 the provider refuses (Brevo's IP blocking, on by default for new accounts, refuses a Worker, which
 has no fixed IP), low SMS credit (a Twilio balance under 5, or fewer than 20 Brevo credits), and
 every SMS or recap that failed in the last 24 hours, as well as every ended call that never got a
-recap, every call cut at the time cap, and any number that called 5 times or more. When it finds
-something, it emails `ALERT_EMAIL`, or the first `NOTIFY_EMAIL`, with one line per problem.
+recap, every call cut at the time cap, any number that called 5 times or more, and the calls the
+screen refused, per number and reason. When it finds something, it emails `ALERT_EMAIL`, or the first
+`NOTIFY_EMAIL`, with one line per problem.
 
 ## 13. A long, silent or abusive call
 
@@ -137,6 +138,23 @@ Every minute is billed, so three limits end a call that should end:
 
 The end-of-call report records Vapi's reason (`exceeded-max-duration`, `silence-timed-out`,
 `assistant-ended-call`, `customer-ended-call`) in `ended_reason`, which the daily check reads.
+
+## 14. Screening a call before anything answers
+
+The Worker counts the calls it let through and turns a caller away when:
+
+| Reason | Rule (default, set in `[vars]`) | What the caller gets |
+|---|---|---|
+| `blocked` | the number is in `BLOCKED_NUMBERS` | method 1: rejected, never answered; method 2: one sentence |
+| `number-hour`, `number-day` | 4 calls this hour, or 8 today, already let through for this number | « Vos appels précédents ont bien été transmis… », and 112 for an emergency |
+| `anonymous` | 5 withheld numbers already let through this hour | asked to call back without hiding the number |
+| `total` | 30 calls already let through this hour, all callers together | asked to call back later |
+
+Every refusal names 112 for an emergency. Method 1 runs at Twilio, before Vapi (`/api/twilio/voice`,
+signed requests only); method 2 runs when Vapi asks which assistant answers (`assistant-request`).
+Use one, not both. Each screened call becomes a row of `call_attempts`; only allowed calls count
+toward the limits, so a refused caller is let through again once the hour or the day has passed. If
+the screen breaks, the call is let through rather than lost.
 
 ## Planned, not built
 

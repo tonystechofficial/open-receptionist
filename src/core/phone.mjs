@@ -11,13 +11,22 @@ export function normalizePhone(p) {
 }
 
 /**
- * Whether an SMS can reach this number. Among French numbers only mobiles (06, 07) receive SMS:
- * landlines and internet-box lines (01 to 05, 09) and service numbers (08) do not. A foreign number
- * gets its chance, since its numbering plan is not known here.
+ * Why an SMS must not go to this number, or null when it may. Only the listed countries (dialling
+ * codes, France by default) get an SMS: a caller can dictate any number for the confirmation, and SMS
+ * to some countries cost many times the French rate (SMS pumping fraud). Among French numbers only
+ * mobiles (06, 07) receive SMS: landlines and internet-box lines (01 to 05, 09) and service numbers
+ * (08) do not.
  */
-export function canReceiveSms(phone) {
+export function smsRefusal(phone, countries = ['33']) {
   const n = normalizePhone(phone);
-  if (!n) return false;
-  if (n.startsWith('+33')) return /^\+33[67]\d{8}$/.test(n);
-  return true;
+  if (!n) return 'numéro invalide';
+  const country = countries.find((code) => n.startsWith(`+${code}`));
+  if (!country) return 'pays non autorisé pour les SMS (SMS_COUNTRIES)';
+  if (country === '33' && !/^\+33[67]\d{8}$/.test(n)) return 'numéro fixe ou spécial, qui ne reçoit pas de SMS';
+  return null;
+}
+
+/** Whether an SMS can reach this number, from the countries listed. */
+export function canReceiveSms(phone, countries) {
+  return smsRefusal(phone, countries) === null;
 }

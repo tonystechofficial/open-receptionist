@@ -47,6 +47,31 @@ export function callProblems(calls = []) {
   return problems;
 }
 
+const REFUSAL_LABEL = {
+  blocked: 'numéro bloqué',
+  'number-hour': "trop d'appels du même numéro dans l'heure",
+  'number-day': "trop d'appels du même numéro dans la journée",
+  anonymous: "vague d'appels en numéro masqué",
+  total: "plafond d'appels par heure atteint",
+};
+
+/** The calls the screen turned away, summed up per number and reason, one line each. */
+export function screeningProblems(attempts = []) {
+  const groups = new Map();
+  for (const a of attempts) {
+    if (a.decision !== 'refused') continue;
+    const key = `${a.number ?? ''}|${a.reason}`;
+    groups.set(key, { number: a.number, reason: a.reason, count: (groups.get(key)?.count ?? 0) + 1 });
+  }
+  return [...groups.values()].map(({ number, reason, count }) => {
+    if (reason === 'no-assistant') {
+      return `Configuration : VAPI_ASSISTANT_ID manquant, ${count} appel(s) n'ont pas pu être confiés à l'assistant.`;
+    }
+    const who = number ? `du ${formatPhoneFr(number)}` : 'en numéro masqué';
+    return `${count} appel(s) ${who} refusé(s) en 24 heures : ${REFUSAL_LABEL[reason] ?? reason}.`;
+  });
+}
+
 const LOW_SMS_CREDITS = 20; // Brevo counts credits: about ten bookings, a confirmation and a recap each
 const LOW_BALANCE = 5; // Twilio counts money and recharges itself under 10 by default: below 5, it failed
 

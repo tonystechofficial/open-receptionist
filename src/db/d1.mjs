@@ -13,6 +13,45 @@ export function d1Store(db) {
   return {
     getCall,
 
+    async recordAttempt(a) {
+      await db
+        .prepare('INSERT INTO call_attempts (number, at, decision, reason, via, provider_call_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(v(a.number), a.at, a.decision, v(a.reason), a.via, v(a.providerCallId))
+        .run();
+      return a;
+    },
+
+    /** One query for the four counts the screen needs; only allowed calls count. */
+    async attemptCounts({ number, now }) {
+      const t = new Date(now).getTime();
+      const hour = new Date(t - 3_600_000).toISOString();
+      const day = new Date(t - 86_400_000).toISOString();
+      const row = await db
+        .prepare(
+          `SELECT
+             COALESCE(SUM(CASE WHEN number = ? AND at >= ? THEN 1 ELSE 0 END), 0) AS number_hour,
+             COALESCE(SUM(CASE WHEN number = ? THEN 1 ELSE 0 END), 0) AS number_day,
+             COALESCE(SUM(CASE WHEN number IS NULL AND at >= ? THEN 1 ELSE 0 END), 0) AS anonymous_hour,
+             COALESCE(SUM(CASE WHEN at >= ? THEN 1 ELSE 0 END), 0) AS total_hour
+           FROM call_attempts WHERE decision = 'allowed' AND at >= ?`,
+        )
+        .bind(v(number), hour, v(number), hour, hour, day)
+        .first();
+      return {
+        numberHour: Number(row?.number_hour ?? 0),
+        numberDay: Number(row?.number_day ?? 0),
+        anonymousHour: Number(row?.anonymous_hour ?? 0),
+        totalHour: Number(row?.total_hour ?? 0),
+      };
+    },
+
+    async attemptsSince(iso) {
+      const rows = (await db.prepare('SELECT * FROM call_attempts WHERE at >= ? ORDER BY at').bind(iso).all())?.results ?? [];
+      return rows.map((r) => ({
+        number: r.number, at: r.at, decision: r.decision, reason: r.reason, via: r.via, providerCallId: r.provider_call_id,
+      }));
+    },
+
     async upsertCall(callId, patch) {
       const now = new Date().toISOString();
       const previous = await getCall(callId);

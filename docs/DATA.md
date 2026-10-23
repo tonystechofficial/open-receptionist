@@ -18,7 +18,7 @@ there, during the call. That never depends on the platform's own data features.
 
 ## What our database keeps
 
-Two tables, created by `migrations/0001_init.sql` in Cloudflare D1:
+Three tables, created by `migrations/0001_init.sql` in Cloudflare D1:
 
 - **`calls`**, one row per call, keyed by the platform's call id: name, need, urgency, phone
   (international form), email, whether the details are complete, the status (`rdv` or
@@ -28,6 +28,9 @@ Two tables, created by `migrations/0001_init.sql` in Cloudflare D1:
   failed with the provider's message, or skipped with the reason.
 - **`appointments`**, one row per booking: the call it came from, the UTC start, the French label sent
   to the caller, the caller's details and the calendar's booking reference.
+- **`call_attempts`**, one row per incoming call the screen saw: the caller's number (empty when
+  withheld), the time, allowed or refused and why, and Twilio's or Vapi's call id. It holds phone
+  numbers, so the retention period applies to it too.
 
 Two guarantees come from this shape:
 

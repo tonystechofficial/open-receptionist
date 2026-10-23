@@ -154,3 +154,11 @@ test('a silence timeout outside 10 to 120 seconds is refused', () => {
     assert.ok(r.errors.some((e) => e.includes('silenceTimeoutSeconds')), String(silenceTimeoutSeconds));
   }
 });
+
+test('an owner SMS number abroad is refused unless its country is listed', () => {
+  const foreign = { ...base, notify: { ...base.notify, sms: ['+44 7700 900123'] } };
+  assert.equal(validateClientConfig(foreign).ok, false);
+  const r = validateClientConfig({ ...foreign, smsCountries: ['33', '44'] });
+  assert.equal(r.ok, true, r.errors.join('; '));
+  assert.deepEqual(validateClientConfig(base).config.smsCountries, ['33']);
+});

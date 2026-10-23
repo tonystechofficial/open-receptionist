@@ -26,6 +26,16 @@ CALCOM_EVENT_TYPE_ID = "123456"
 MAIL_FROM = "Accueil <accueil@your-domain.fr>"
 SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 letters or digits, one letter at least; carriers filter "Info" or "Accueil"
 # ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily check's alerts; defaults to the first NOTIFY_EMAIL
+# SMS_COUNTRIES = "33"                # dialling codes that may receive an SMS (France only by default)
+
+# Call screening (docs/SETUP.md, step 5.4). Calls let through are counted per number, for withheld
+# numbers and in total; beyond the limits, the caller is turned away before Vapi answers.
+VAPI_ASSISTANT_ID = ""                # the assistant id printed in step 4.3; needed for screening method 2
+# BLOCKED_NUMBERS = "06 00 00 00 01"  # comma-separated, refused outright
+# SCREEN_PER_NUMBER_HOUR = "4"
+# SCREEN_PER_NUMBER_DAY = "8"
+# SCREEN_ANONYMOUS_HOUR = "5"         # withheld numbers, all together
+# SCREEN_TOTAL_HOUR = "30"            # every caller together: bounds a flood from many numbers
 # Only if Cal.com moves its API versions again (defaults: slots 2024-09-04, bookings 2026-02-25):
 # CALCOM_SLOTS_API_VERSION = "2024-09-04"
 # CALCOM_BOOKINGS_API_VERSION = "2026-02-25"

@@ -5,7 +5,8 @@
 import { qualify, mergeCaller } from '../core/qualify.mjs';
 import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant, withoutSlot } from '../core/slots.mjs';
 import { confirmationSms, ownerRecap } from '../core/messages.mjs';
-import { canReceiveSms } from '../core/phone.mjs';
+import { normalizePhone, smsRefusal } from '../core/phone.mjs';
+import { screenIncoming, recordUnroutable } from './screening.mjs';
 import * as vapi from '../providers/voice/vapi.mjs';
 
 const DAY_MS = 86_400_000;
@@ -13,9 +14,26 @@ const MISSING = { nom: 'le nom', besoin: 'le besoin', contact: 'un numéro de t�
 
 /** Single entry point for everything the voice platform posts to the webhook. */
 export async function handleVapiMessage(message, deps) {
+  if (message?.type === 'assistant-request') return handleAssistantRequest(message, deps);
   if (message?.type === 'tool-calls') return handleToolCall(message, deps);
   if (vapi.isEndOfCall(message)) return handleCallReport(message, deps);
   return { ignored: true };
+}
+
+/**
+ * Method 2 of call screening: when the phone number has no assistant of its own, Vapi asks which
+ * assistant answers. A refused caller gets `{ error }`, which Vapi speaks before hanging up; an
+ * allowed one gets the saved assistant. https://docs.vapi.ai/server-url/spam-call-rejection
+ */
+export async function handleAssistantRequest(message, deps) {
+  const call = { number: normalizePhone(vapi.getCallerNumber(message)), via: 'vapi', providerCallId: vapi.getCallId(message) };
+  const assistantId = deps.screening?.assistantId;
+  if (!assistantId) {
+    (deps.log ?? console.error)('[open-receptionist] assistant-request without VAPI_ASSISTANT_ID');
+    return { error: await recordUnroutable(call, deps) };
+  }
+  const verdict = await screenIncoming(call, deps);
+  return verdict.allow ? { assistantId } : { error: verdict.message };
 }
 
 export async function handleToolCall(message, deps) {
@@ -231,14 +249,18 @@ function resolveChoice(creneau, offered, now) {
 // A delivery is { status: 'sent' | 'failed' | 'skipped', to?, reason?, at }. It is stored on the call,
 // so a refused SMS leaves a trace that the daily check reports, not just a log line.
 
-/** The caller's confirmation SMS. Only a mobile can receive it: a landline caller is not promised one. */
+/**
+ * The caller's confirmation SMS. Only a mobile in a listed country receives it (France by default):
+ * a landline caller is not promised one, and a dictated foreign number cannot be used for SMS pumping.
+ */
 async function confirmToCaller(caller, label, ctx) {
   const at = ctx.now.toISOString();
   const to = caller.telephone;
   if (ctx.config.confirmation?.sms === false) return { status: 'skipped', reason: 'confirmation par SMS désactivée', at };
   if (!ctx.deps.notify?.sms) return { status: 'skipped', reason: 'aucun fournisseur SMS', at };
   if (!to) return { status: 'skipped', reason: 'aucun numéro', at };
-  if (!canReceiveSms(to)) return { status: 'skipped', to, reason: 'numéro fixe ou spécial, qui ne reçoit pas de SMS', at };
+  const refusal = smsRefusal(to, ctx.config.smsCountries);
+  if (refusal) return { status: 'skipped', to, reason: refusal, at };
   try {
     await ctx.deps.notify.sms({
       to,

@@ -134,7 +134,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 154 tests, nothing to install
+npm test        # 187 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -285,6 +285,38 @@ Note the assistant id it prints. To update the assistant later, run the same com
    `**62*<number>#` for unreachable; landlines and internet boxes set it in the operator's interface.
    Test each case with a real call.
 
+### 5.4 Screen incoming calls
+
+Every minute is billed, so the Worker can turn a caller away before anything answers: a number in
+`BLOCKED_NUMBERS`, a number already let through 4 times this hour or 8 times today, more than 5
+withheld numbers in the hour, or more than 30 calls in the hour in total (all adjustable in
+`[vars]`). A refused caller always hears how to reach help in an emergency. Set up **one** of the two
+methods, never both, or each call is counted twice.
+
+**Method 1, the number is at Twilio (recommended).** Twilio asks the Worker first, and a refused call
+never reaches Vapi: a blocked number is rejected without being answered, so nobody bills it, and a
+limited caller hears one sentence before the line closes.
+
+1. Import the number into Vapi first (item 2 above): the import sets Twilio's webhook to Vapi's.
+2. In the Twilio Console, open the number, and under **Voice > A call comes in**, set the webhook to
+   `https://open-receptionist.<your-subdomain>.workers.dev/api/twilio/voice`, method `POST`.
+3. Keep `TWILIO_AUTH_TOKEN` set: the Worker reads only requests signed with it.
+
+Allowed calls are redirected to `https://api.vapi.ai/twilio/inbound_call`, the webhook Vapi itself
+sets, so Vapi answers as before. Re-importing the number into Vapi puts Vapi's webhook back: redo
+step 2 afterwards.
+
+**Method 2, any number (a Vapi number, Telnyx).** Vapi asks the Worker which assistant answers.
+
+1. Set `VAPI_ASSISTANT_ID` in `[vars]` to the id printed in step 4.3, and deploy.
+2. In Vapi, open the phone number: remove its assistant, and set its **Server URL** to
+   `https://open-receptionist.<your-subdomain>.workers.dev/api/vapi` with the credential from step 4.1.
+
+A refused caller hears the reason spoken by Vapi, a few seconds of billed time.
+
+Every screened call is written to the `call_attempts` table, and the daily check sums up the refused
+ones. If the screen itself breaks, calls are let through rather than lost.
+
 ## 6. Go-live checklist
 
 Run `npm run cf:tail` in a terminal to watch the Worker, then call and tick each line:
@@ -303,6 +335,8 @@ Run `npm run cf:tail` in a terminal to watch the Worker, then call and tick each
     --command "SELECT call_id, status, nom, telephone, deliveries FROM calls ORDER BY created_at DESC LIMIT 5"
   ```
 - [ ] `/api/check`, from step 3.5, answers `{"ok":true,"problems":[]}`.
+- [ ] With screening on (step 5.4), your test calls appear in `call_attempts` as `allowed`, and a
+  number added to `BLOCKED_NUMBERS` is refused.
 
 Then turn on **Zero Data Retention** in Vapi's organisation settings. The caller's details keep
 flowing through your tools into your database; only Vapi's own copy of the call goes away. Make one
@@ -326,6 +360,8 @@ effect of Zero Data Retention, not a fault.
     --command "DELETE FROM appointments WHERE created_at < date('now','-12 months')"
   npx wrangler d1 execute open-receptionist --remote \
     --command "DELETE FROM calls WHERE created_at < date('now','-12 months')"
+  npx wrangler d1 execute open-receptionist --remote \
+    --command "DELETE FROM call_attempts WHERE at < date('now','-12 months')"
   ```
 - **Data location.** The database is in the EU, but the voice platform's real-time processing is not
   guaranteed to stay in the EU. Do not promise "data hosted in Europe" in writing.
@@ -344,6 +380,8 @@ effect of Zero Data Retention, not a fault.
 | Rotate another key | `npx wrangler secret put <NAME>`; it takes effect without a separate deploy |
 | Back up the database | `npx wrangler d1 export open-receptionist --remote --output backup.sql`; D1's point-in-time restore also covers recent days, depending on your plan |
 | Find failed messages | the daily check emails them; to look yourself: `npx wrangler d1 execute open-receptionist --remote --command "SELECT call_id, deliveries FROM calls WHERE deliveries LIKE '%failed%' ORDER BY updated_at DESC LIMIT 20"` |
+| Block a number | add it to `BLOCKED_NUMBERS` in `[vars]`, then `npm run deploy` |
+| See refused calls | the daily check sums them up; to look yourself: `npx wrangler d1 execute open-receptionist --remote --command "SELECT number, at, reason, via FROM call_attempts WHERE decision = 'refused' ORDER BY at DESC LIMIT 20"` |
 | Watch costs | Vapi minutes, the SMS balance (the daily check warns under 5 at Twilio, or under 20 Brevo credits), the number's rental |
 
 ## 9. Limits of this version

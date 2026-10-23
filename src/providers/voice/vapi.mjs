@@ -10,12 +10,14 @@
 //    the inline `secret` field is the legacy form   https://docs.vapi.ai/server-url/server-authentication
 // The caller's details are captured by our own noter_demande tool rather than by Vapi's analysis
 // plan, which is migrating to "structured outputs". That keeps the capture portable to Retell & co.
+import { safeEqual } from '../../server/secrets.mjs';
 
 export function isEndOfCall(message) { return message?.type === 'end-of-call-report'; }
 export function getToolCalls(message) { return message?.toolCallList ?? message?.toolCalls ?? []; }
 export function getCallId(message) { return message?.call?.id ?? null; }
 export function getCallerNumber(message) {
-  return message?.call?.customer?.number || message?.customer?.number || null;
+  // call.from.phoneNumber is where Vapi's spam-rejection example reads it on an assistant-request.
+  return message?.call?.customer?.number || message?.customer?.number || message?.call?.from?.phoneNumber || null;
 }
 /** Summary and legacy structured data, wherever this Vapi version puts them. */
 export function getAnalysis(message) {
@@ -28,7 +30,7 @@ export function toolResults(results) { return { results }; }
 export function verifySecret(headers = {}, expected) {
   if (!expected) return true;
   const value = typeof headers.get === 'function' ? headers.get('x-vapi-secret') : headers['x-vapi-secret'];
-  return value === expected;
+  return safeEqual(value, expected);
 }
 
 const URGENCE = {

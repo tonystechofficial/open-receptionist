@@ -9,6 +9,7 @@ const DEFAULTS = {
   silenceTimeoutSeconds: 30, // hang up after this long without speech; Vapi does not document its default
   voice: { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' },
   confirmation: { sms: true }, // SMS the caller once the appointment is booked
+  smsCountries: ['33'], // dialling codes that may receive an SMS: France only, against SMS pumping
 };
 
 // Sender names French carriers filter as generic: Twilio's France guidelines name SMS, Info, Verify,
@@ -38,12 +39,14 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   if (emails.length === 0) {
     errors.push('notify.email is required: the email recap is the record of every call, SMS only comes on top');
   }
+  const smsCountries = Array.isArray(cfg.smsCountries) && cfg.smsCountries.length ? cfg.smsCountries.map(String) : DEFAULTS.smsCountries;
   const sms = [];
   for (const raw of Array.isArray(notify.sms) ? notify.sms.filter(Boolean) : []) {
     const number = normalizePhone(raw);
     if (!number) errors.push(`notify.sms: "${raw}" is not a phone number`);
-    else if (!canReceiveSms(number)) errors.push(`notify.sms: ${raw} cannot receive SMS, give a mobile (06 or 07)`);
-    else sms.push(number);
+    else if (!canReceiveSms(number, smsCountries)) {
+      errors.push(`notify.sms: ${raw} cannot receive SMS: give a mobile (06 or 07), or list its country in smsCountries`);
+    } else sms.push(number);
   }
 
   // Operators accept an alphanumeric sender of 3 to 11 characters, with at least one letter (digits
@@ -86,6 +89,7 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   config.voice = cfg.voice || DEFAULTS.voice;
   config.confirmation = { ...DEFAULTS.confirmation, ...(cfg.confirmation || {}) };
   config.notify = { ...notify, email: emails, sms };
+  config.smsCountries = smsCountries;
 
   return { ok: errors.length === 0, errors, warnings, config };
 }

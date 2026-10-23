@@ -230,3 +230,79 @@ test('the daily check reports a call cut at the time cap', async () => {
     assert.match(mails[0].text, /durée maximale/);
   });
 });
+
+// Screening incoming calls (2026-10-24). Method 1: Twilio posts each call to the Worker first.
+import { createHmac } from 'node:crypto';
+
+const VOICE_URL = 'https://w.example/api/twilio/voice';
+const SCREEN_ENV = { ...TWILIO_ENV, BLOCKED_NUMBERS: '06 00 00 00 01', VAPI_ASSISTANT_ID: 'asst_1' };
+
+function twilioCall(from, { env = SCREEN_ENV, callSid = 'CA_test_call', sign = true } = {}) {
+  const params = { AccountSid: 'AC_test_account', CallSid: callSid, From: from, To: '+33556123456' };
+  const data = VOICE_URL + Object.keys(params).sort().map((k) => k + params[k]).join('');
+  const headers = { 'content-type': 'application/x-www-form-urlencoded' };
+  if (sign) headers['x-twilio-signature'] = createHmac('sha1', env.TWILIO_AUTH_TOKEN).update(data).digest('base64');
+  return new Request(VOICE_URL, { method: 'POST', headers, body: new URLSearchParams(params).toString() });
+}
+
+test('Twilio: an allowed call is forwarded to Vapi', async () => {
+  const w = createWorker({ makeStore: () => memoryStore() });
+  const res = await w.fetch(twilioCall('+33612345678'), SCREEN_ENV);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /xml/);
+  assert.match(await res.text(), /<Redirect method="POST">https:\/\/api\.vapi\.ai\/twilio\/inbound_call<\/Redirect>/);
+});
+
+test('Twilio: a request without a valid signature is refused', async () => {
+  const w = createWorker({ makeStore: () => memoryStore() });
+  assert.equal((await w.fetch(twilioCall('+33612345678', { sign: false }), SCREEN_ENV)).status, 403);
+});
+
+test('Twilio: a blocked number is rejected without being answered', async () => {
+  const w = createWorker({ makeStore: () => memoryStore() });
+  assert.match(await (await w.fetch(twilioCall('+33600000001'), SCREEN_ENV)).text(), /<Reject reason="rejected"\/>/);
+});
+
+test('Twilio: the fifth call in an hour hears one sentence and the line closes, Vapi never answers', async () => {
+  const store = memoryStore();
+  const w = createWorker({ makeStore: () => store });
+  for (let i = 0; i < 4; i += 1) {
+    assert.match(await (await w.fetch(twilioCall('+33612345678', { callSid: `CA_test_${i}` }), SCREEN_ENV)).text(), /<Redirect/);
+  }
+  const fifth = await (await w.fetch(twilioCall('+33612345678', { callSid: 'CA_test_5' }), SCREEN_ENV)).text();
+  assert.match(fifth, /<Say language="fr-FR">[^<]*112[^<]*<\/Say><Hangup\/>/);
+  assert.doesNotMatch(fifth, /Redirect/);
+});
+
+test('Twilio: when the screen itself breaks, the call still goes through', async () => {
+  const w = createWorker({ makeStore: () => memoryStore() });
+  const broken = { ...SCREEN_ENV, CLIENT_COMPANY: '' };
+  assert.match(await (await w.fetch(twilioCall('+33612345678', { env: broken }), broken)).text(), /<Redirect/);
+});
+
+// Method 2: Vapi asks the Worker which assistant answers (assistant-request).
+const assistantRequest = (number) => ({ message: { type: 'assistant-request', call: { id: 'call_ar', customer: { number } } } });
+
+test('Vapi: an assistant-request is answered with the saved assistant', async () => {
+  const w = createWorker({ makeStore: () => memoryStore() });
+  const res = await w.fetch(post('/api/vapi', assistantRequest('+33612345678')), SCREEN_ENV);
+  assert.deepEqual(await res.json(), { assistantId: 'asst_1' });
+});
+
+test('Vapi: an assistant-request still gets the assistant when the screen breaks', async () => {
+  const w = createWorker({ makeStore: () => memoryStore() });
+  const broken = { ...SCREEN_ENV, CLIENT_COMPANY: '' };
+  assert.deepEqual(await (await w.fetch(post('/api/vapi', assistantRequest('+33612345678')), broken)).json(), { assistantId: 'asst_1' });
+});
+
+test('the daily check reports the calls the screen refused', async () => {
+  await withFakeApis({}, async (mails) => {
+    const store = memoryStore();
+    for (let i = 0; i < 3; i += 1) {
+      await store.recordAttempt({ number: '+33612345678', at: new Date().toISOString(), decision: 'refused', reason: 'number-hour', via: 'twilio', providerCallId: `CA${i}` });
+    }
+    await runScheduled(createWorker({ makeStore: () => store }), CHECK_ENV);
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].text, /06 12 34 56 78/);
+  });
+});

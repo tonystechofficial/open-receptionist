@@ -4,6 +4,7 @@
 // then build deps per client.
 import { readFile } from 'node:fs/promises';
 import { validateClientConfig } from '../core/config.mjs';
+import { blockedNumbers, screeningLimits } from '../core/screening.mjs';
 import { calcom } from '../providers/calendar/calcom.mjs';
 import { google } from '../providers/calendar/google.mjs';
 import { resend } from '../providers/notify/resend.mjs';
@@ -37,7 +38,10 @@ export async function buildDeps() {
 
   const store = env.DATA_FILE ? jsonFileStore(env.DATA_FILE) : memoryStore();
 
-  cached = { calendar, notify, store, config };
+  // Call screening, method 2 (assistant-request); the Twilio entry of method 1 lives in the Worker only.
+  const screening = { assistantId: env.VAPI_ASSISTANT_ID || undefined, blocked: blockedNumbers(env.BLOCKED_NUMBERS), limits: screeningLimits(env) };
+
+  cached = { calendar, notify, store, config, screening };
   return cached;
 }
 
@@ -58,6 +62,7 @@ function envConfig(env) {
     telephone: env.CLIENT_TELEPHONE || undefined,
     timeZone: env.TIME_ZONE || undefined,
     smsSender: env.SMS_SENDER || undefined,
+    smsCountries: list(env.SMS_COUNTRIES),
     confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
     calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
     notify: { email: list(env.NOTIFY_EMAIL), sms: list(env.NOTIFY_SMS) },
