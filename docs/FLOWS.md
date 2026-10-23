@@ -1,7 +1,7 @@
 # Call flows
 
 What the caller hears, what the system does, and what is stored and sent, for every situation.
-Each behaviour below is pinned by a test in `test/handlers.test.mjs`. The words the agent says are
+Each behaviour below is pinned by a test in `test/`, the call flows in `test/handlers.test.mjs`. The words the agent says are
 French, because the product answers French callers; everything else here is English.
 
 ## The three tools
@@ -28,10 +28,11 @@ All three post to one endpoint, `/api/vapi`, which also receives the end-of-call
    real. Times are in Paris time and survive the clock change.
 5. The caller picks; `prendre_rdv` books option 1 or 2 in Cal.com, with a UTC start, the phone in
    international form, the need in the notes and the urgency in the metadata. The appointment is
-   written to D1, and the caller receives one SMS:
+   written to D1, and a caller on a mobile receives one SMS:
    « Plomberie Dupont : votre rendez-vous est confirmé pour le vendredi 23 octobre à 9 h 30. Pour le
-   modifier, appelez le 05 56 12 34 56. » It fits one SMS and uses only the SMS alphabet.
-6. The agent confirms, mentions the SMS, and closes.
+   modifier, appelez le 05 56 12 34 56. » It fits one SMS and uses only the SMS alphabet. A landline
+   (`01` to `05`, `09`) cannot receive it, so none is sent.
+6. The agent confirms, mentions the SMS only if it actually left, and closes.
 7. At the end of the call the owner gets an email, « Appel de Jean Dupont : RDV vendredi 23 octobre
    à 9 h 30 », and a one-line SMS.
 
@@ -45,10 +46,16 @@ matin, après-midi and soir. If nothing fits, the agent says so and offers the n
 
 - **Safety first.** The client config can carry safety instructions (`urgences`), read before
   anything else when the situation matches. The plumbing example covers a gas smell (leave the
-  premises, touch no switch, call Urgence Sécurité Gaz on 0 800 47 33 33, free and open day and
-  night, or 112 if someone feels unwell) and a major water leak (close the main valve, cut the power
-  if water nears the sockets). Source for the gas number:
-  [fournisseurs-electricite.com, GRDF urgence gaz](https://www.fournisseurs-electricite.com/grdf/urgence-gaz).
+  premises, touch no switch, call the gas emergency line from outside, or 112 if someone feels
+  unwell) and a major water leak (close the main valve, cut the power if water nears the sockets).
+  The instruction lives in the prompt, not in code, which is why the go-live checklist tests it.
+- **The gas emergency number depends on who runs the network, not on the gas supplier.** Most of
+  France is GRDF: Urgence Sécurité Gaz, 0 800 47 33 33, free, day and night
+  ([source](https://www.fournisseurs-electricite.com/grdf/urgence-gaz)). Local distributors run
+  their own networks with their own lines: Bordeaux and about 46 communes of Gironde are Régaz-Bordeaux,
+  05 56 79 41 00, day and night (consistent secondary sources; regaz.fr was down for maintenance when
+  checked on 2026-10-23). The Bordeaux example gives both; for another area, put the number of the
+  client's network and keep their written validation. 112 always works.
 - **No slot within four hours.** The agent says the emergency is noted as a priority and that the
   company calls back as soon as possible, and still offers the earliest slot.
 - **The owner sees it first.** The recap email subject starts with `[URGENT]` and the SMS with
@@ -87,6 +94,10 @@ the company will call back; the owner recap shows the request.
   call-back, and the call is marked « à rappeler » with a note.
 - **Webhook misconfigured:** it still answers HTTP 200 with a call-back instruction for each tool
   call. Vapi ignores tool results sent with any other status, which would leave the caller in silence.
+  The daily check reports the configuration error the next morning.
+- **An SMS or an email refused:** the call goes on. The refusal and the provider's message are kept in
+  the call's `deliveries`, the agent does not mention an SMS that did not leave, and the daily check
+  emails the failure.
 
 ## 10. The caller hangs up early, or no tool was used
 
@@ -95,9 +106,22 @@ when present, and the caller ID.
 
 ## 11. The owner recap
 
-Sent once per call: `recap_sent_at` turns a redelivered end-of-call report into a no-op. The email
-lists the name, need, urgency, phone, email, the appointment or « aucun, à rappeler », and Vapi's
-summary. The SMS is one line in the SMS alphabet.
+The email is required and is the record of every call; the SMS is optional, on top. The email lists
+the name, need, urgency, phone, email, the appointment or « aucun, à rappeler », and Vapi's summary.
+The SMS is one line in the SMS alphabet.
+
+Sent once per call: `recap_sent_at` is set once the recap reached at least one recipient, and turns a
+redelivered end-of-call report into a no-op. A recap that reached nobody leaves it unset, so a
+redelivered report tries again. Each channel's result is kept in `deliveries`.
+
+## 12. The daily check
+
+Every morning a cron trigger runs the check, and `GET /api/check` (with the webhook secret) runs it on
+demand. It reports a configuration the Worker would refuse, a missing provider key, an SMS key Brevo
+refuses (its IP blocking, on by default for new accounts, refuses a Worker, which has no fixed IP),
+fewer than 20 SMS credits left, and every SMS or recap that failed in the last 24 hours, as well as
+every ended call that never got a recap. When it finds something, it emails `ALERT_EMAIL`, or the
+first `NOTIFY_EMAIL`, with one line per problem.
 
 ## Planned, not built
 
@@ -112,14 +136,16 @@ summary. The SMS is one line in the SMS alphabet.
 
 Some things only a real call proves. Check them in this order:
 
-1. `GET /health` answers `{"ok":true}`.
+1. `GET /health` answers `{"ok":true}`, and `GET /api/check` with the webhook secret answers
+   `{"ok":true,"problems":[]}`.
 2. Run `npm run cf:tail`. A webhook call without the credential gets 401; Vapi's calls get 200.
 3. Ask for an appointment. `wrangler tail` must show a POST to `/api/vapi` with type `tool-calls`.
    If tool calls never arrive, check the tool's server URL on the assistant in the Vapi dashboard.
 4. In Cal.com, the event type's booking questions must make the **phone number required and the
    email optional**, otherwise a phone-only booking is refused with a 400.
 5. Book a slot, then check it in Cal.com and in D1:
-   `npx wrangler d1 execute open-receptionist --remote --command "SELECT call_id, status, nom FROM calls ORDER BY created_at DESC LIMIT 5"`.
-6. Hang up. The owner email and SMS arrive once; the caller SMS arrives once.
+   `npx wrangler d1 execute open-receptionist --remote --command "SELECT call_id, status, nom, deliveries FROM calls ORDER BY created_at DESC LIMIT 5"`.
+6. Hang up. The owner email and SMS arrive once; the caller SMS arrives once. In D1, `deliveries`
+   shows each of them as `sent`.
 7. Check that the agent offered to call back on your own number: that proves Vapi filled in
    `{{customer.number}}`.

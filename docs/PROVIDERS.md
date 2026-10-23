@@ -59,8 +59,11 @@ email optional.
 
 | Channel | Provider | Notes |
 |---|---|---|
-| Email | **Resend** (implemented) | Owner recap. Works from any IP, which matters for a Worker. |
-| SMS | **Brevo transactional SMS** (implemented) | Caller confirmation and owner recap. Sender 3 to 11 letters or digits; texts are kept in the SMS alphabet so one message holds 160 characters. |
+| Email | **Resend** (implemented) | Owner recap, required: the record of every call. Works from any IP, which matters for a Worker. |
+| SMS | **Brevo transactional SMS** (implemented) | Caller confirmation, to mobiles only, and owner recap. The sender is the business's short name, 3 to 11 letters or digits: there is no default, and generic names such as `Info` or `Accueil` are refused because carriers filter them. Texts are kept in the SMS alphabet so one message holds 160 characters. Brevo's IP blocking, on by default for new accounts, refuses a Worker, which has no fixed IP: turn it off. The daily check calls `GET /v3/account` with the key and reports a refusal or fewer than 20 credits. |
+
+Any other SMS provider only needs the same two functions: `sendSms({ to, content, sender })`, which
+throws when the provider refuses, and `check()`, which returns `{ smsCredits }` or throws.
 
 ## Database (the source of truth)
 

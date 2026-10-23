@@ -234,7 +234,7 @@ test('a duplicated end-of-call delivery sends the recap once', async () => {
   await H.handleCallReport(endOfCall(), deps);
   await H.handleCallReport(endOfCall(), deps);
   assert.equal(sent.email.length, 1);
-  assert.equal(sent.sms.filter((s) => s.to === '33600000000').length, 1);
+  assert.equal(sent.sms.filter((s) => String(s.to).replace(/\D/g, '') === '33600000000').length, 1);
 });
 
 test('a call with no tool use is still recapped from the caller ID and the call analysis', async () => {
@@ -255,4 +255,75 @@ test('handleVapiMessage routes each Vapi message type', async () => {
   const report = await H.handleVapiMessage(endOfCall(), deps);
   assert.equal(report.ok, true);
   assert.deepEqual(await H.handleVapiMessage({ type: 'status-update' }, deps), { ignored: true });
+});
+
+// Deliveries are recorded on the call (2026-10-23): a refused SMS used to leave only a log line,
+// a landline caller was promised an SMS, and a recap that reached nobody was marked as sent.
+const BOOK = { creneau: '2026-10-23T07:30:00Z', nom: 'Jean Dupont', besoin: 'fuite' };
+const refused = (label) => async () => { throw new Error(`${label} 401: unrecognised IP address 104.28.0.1`); };
+
+test('a caller on a landline is not promised an SMS, and the call says why', async () => {
+  const { sent, deps } = setup();
+  const landline = { id: 'call_fixe', type: 'inboundPhoneCall', customer: { number: '+33556123456' } };
+  const r = first(await H.handleToolCall(tool('prendre_rdv', BOOK, { call: landline }), deps));
+  assert.equal(sent.sms.length, 0);
+  assert.doesNotMatch(r.result, /SMS/);
+  const d = (await deps.store.getCall('call_fixe')).deliveries.callerSms;
+  assert.equal(d.status, 'skipped');
+  assert.match(d.reason, /fixe/);
+});
+
+test('a sent caller SMS is recorded on the call', async () => {
+  const { deps } = setup();
+  await H.handleToolCall(tool('prendre_rdv', BOOK), deps);
+  const d = (await deps.store.getCall('call_1')).deliveries.callerSms;
+  assert.equal(d.status, 'sent');
+  assert.equal(d.to, '+33612345678');
+});
+
+test('a refused caller SMS is recorded with its reason, and the agent does not promise it', async () => {
+  const { deps } = setup();
+  deps.notify.sms = refused('brevo sms');
+  const r = first(await H.handleToolCall(tool('prendre_rdv', BOOK), deps));
+  assert.doesNotMatch(r.result, /SMS/);
+  const d = (await deps.store.getCall('call_1')).deliveries.callerSms;
+  assert.equal(d.status, 'failed');
+  assert.match(d.reason, /401/);
+});
+
+test('each recap channel is recorded on the call, failures included', async () => {
+  const { deps } = setup();
+  deps.notify.sms = refused('brevo sms');
+  await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'devis' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  const { recap } = (await deps.store.getCall('call_1')).deliveries;
+  assert.equal(recap.email.status, 'sent');
+  assert.equal(recap.sms.length, 1);
+  assert.equal(recap.sms[0].status, 'failed');
+  assert.equal(recap.sms[0].to, '+33600000000');
+  assert.match(recap.sms[0].reason, /401/);
+});
+
+test('a recap that reached nobody is not marked as sent, so a redelivered report tries again', async () => {
+  const { sent, deps } = setup();
+  let down = true;
+  deps.notify.email = async (m) => { if (down) throw new Error('resend 500'); sent.email.push(m); };
+  deps.notify.sms = async (m) => { if (down) throw new Error('brevo sms 401'); sent.sms.push(m); };
+  await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'devis' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  assert.equal((await deps.store.getCall('call_1')).recapSentAt ?? null, null);
+  down = false;
+  await H.handleCallReport(endOfCall(), deps);
+  assert.equal(sent.email.length, 1);
+  assert.ok((await deps.store.getCall('call_1')).recapSentAt);
+});
+
+test('without an email provider the recap email is recorded as failed, not skipped in silence', async () => {
+  const { deps } = setup();
+  delete deps.notify.email;
+  await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'devis' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  const { recap } = (await deps.store.getCall('call_1')).deliveries;
+  assert.equal(recap.email.status, 'failed');
+  assert.match(recap.email.reason, /email/);
 });

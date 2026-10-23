@@ -30,12 +30,14 @@ command below as written; PowerShell variants are given where the syntax differs
 **From the client, in writing:**
 
 - the company name, the trade, the opening hours, and the phone number customers can call back on;
-- who receives the recap after each call: email addresses and mobile numbers;
+- who receives the recap after each call: at least one email address, the record of every call,
+  and optionally mobile numbers for an SMS on top;
 - the appointment type: its name, its duration, the buffer between visits, and how much notice
   they need before an appointment;
 - the calendar the bookings should land in;
 - what the receptionist must say in an emergency, validated by them. The plumbing example in
-  `config/client.example.json` covers a gas smell and a major leak;
+  `config/client.example.json` covers a gas smell and a major leak. The gas emergency number depends
+  on who runs the gas network where they work, see [FLOWS.md](FLOWS.md#3-an-emergency);
 - whether they keep their current number and forward calls to the receptionist, or publish a new one.
 
 ### If the client owns the accounts
@@ -98,19 +100,25 @@ To test before the number is approved, use a free Vapi number, as described in s
 
 ### 1.6 Brevo, for SMS
 
-1. Use an account **without the "authorised IPs" restriction**. A Cloudflare Worker has no fixed IP
-   address, so a restricted account refuses every SMS. If your main Brevo account is restricted,
-   open a separate one for the receptionist.
-2. Buy SMS credits and choose a sender name of 3 to 11 letters or digits, such as the business's
-   short name.
+1. **Turn off Brevo's IP blocking.** Brevo refuses API calls from unknown IP addresses (**Security >
+   Authorised IPs**). It is on by default for accounts created since May 2024, and it switches itself
+   on for older accounts after 30 days without a new IP. A Cloudflare Worker has no fixed IP address,
+   so while the blocking is on, every SMS is refused. Click **Deactivate blocking**; if your main
+   Brevo account must keep it, open a separate account for the receptionist.
+2. Buy SMS credits and choose the sender name: the business's short name, 3 to 11 letters or digits,
+   such as `Dupont`. Carriers filter generic names such as `Info` or `Accueil`, and the configuration
+   check refuses them.
 3. Create an API key.
+
+The daily check (step 3.5) calls Brevo with this key every morning and emails you if Brevo refuses
+it, for example because the blocking came back, or if the SMS credits run low.
 
 ## 2. Get the code and check it
 
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 88 tests, nothing to install
+npm test        # 126 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -153,12 +161,13 @@ Edit the `[vars]` block of `wrangler.toml`:
 | `CLIENT_HORAIRES` | the opening hours, in words |
 | `CLIENT_TELEPHONE` | the number given to callers in the confirmation SMS |
 | `TIME_ZONE` | `Europe/Paris` |
-| `NOTIFY_EMAIL` | the recap recipients, comma-separated |
-| `NOTIFY_SMS` | the recap mobile numbers, international digits without `+`, such as `33612345678` |
+| `NOTIFY_EMAIL` | the recap recipients, comma-separated. Required: the email is the record of every call |
+| `NOTIFY_SMS` | optional: mobile numbers (`06`, `07`) for an SMS recap, comma-separated, written as usual, such as `06 12 34 56 78`. A landline is refused |
 | `CONFIRM_CALLER_SMS` | `true`, or `false` to stop texting callers |
 | `CALCOM_EVENT_TYPE_ID` | the event type id from step 1.2 |
 | `MAIL_FROM` | a sender on the verified Resend domain, such as `Accueil <accueil@yourdomain.fr>` |
-| `SMS_SENDER` | the Brevo sender name from step 1.6 |
+| `SMS_SENDER` | the business's short name from step 1.6, never a generic name such as `Info` or `Accueil`. Required when SMS is on |
+| `ALERT_EMAIL` | who receives the daily check's alerts, usually you. Defaults to the first `NOTIFY_EMAIL` |
 
 To keep the Worker's logs after each call, also add:
 
@@ -183,6 +192,20 @@ curl https://open-receptionist.<your-subdomain>.workers.dev/health
 To serve it from your own domain instead, open the Worker in the Cloudflare dashboard, go to
 **Settings > Domains & Routes**, and add a custom domain from a zone on your account.
 
+### 3.5 Run the daily check once
+
+```bash
+curl -H "x-vapi-secret: <the webhook secret>" \
+  https://open-receptionist.<your-subdomain>.workers.dev/api/check
+# {"ok":true,"problems":[]}
+```
+
+This is the check the `[triggers]` cron in `wrangler.toml` runs every morning, run now and without
+emailing anything. Each problem comes back as a sentence: a configuration the Worker refuses, a missing
+provider key, an SMS key Brevo refuses, SMS credits running low, or a confirmation SMS or recap that
+failed in the last 24 hours. The morning run emails the same list to `ALERT_EMAIL`, only when there
+is one. Each call also keeps, in its `deliveries` column, what was sent to whom and what failed.
+
 ## 4. The Vapi assistant
 
 ### 4.1 Let Vapi authenticate to your Worker
@@ -204,8 +227,9 @@ cp config/client.example.json config/client.json
 Fill it with the **same** company, trade, hours, phone and recipients as the `[vars]`, plus:
 
 - `voice`: a French voice. An ElevenLabs French voice sounds far more natural than the default;
-- `urgences`: the emergency instructions the client validated in writing;
-- `smsSender` and `confirmation`, matching the Worker's settings.
+- `urgences`: the emergency instructions the client validated in writing, with the gas emergency
+  number of their area;
+- `notify`, `smsSender` and `confirmation`, matching the Worker's settings. `notify.email` is required.
 
 `config/client.json` is ignored by git. The Worker reads `wrangler.toml` and the assistant script
 reads `config/client.json`, so change both whenever a setting changes.
@@ -252,14 +276,15 @@ Run `npm run cf:tail` in a terminal to watch the Worker, then call and tick each
 - [ ] Asked for an appointment, it offers two slots in natural French, in Paris time.
 - [ ] The log shows a `tool-calls` POST to `/api/vapi` answered with status 200.
 - [ ] The booking appears in Cal.com and in the connected calendar.
-- [ ] The confirmation SMS arrives once.
+- [ ] The confirmation SMS arrives once. Called from a landline, the receptionist promises none.
 - [ ] After you hang up, the owner receives the recap email and SMS once.
 - [ ] Saying « ça sent le gaz » triggers the safety instructions before any booking.
-- [ ] The call is in the database:
+- [ ] The call is in the database, and its `deliveries` show every message as `sent`:
   ```bash
   npx wrangler d1 execute open-receptionist --remote \
-    --command "SELECT call_id, status, nom, telephone FROM calls ORDER BY created_at DESC LIMIT 5"
+    --command "SELECT call_id, status, nom, telephone, deliveries FROM calls ORDER BY created_at DESC LIMIT 5"
   ```
+- [ ] `/api/check`, from step 3.5, answers `{"ok":true,"problems":[]}`.
 
 Then turn on **Zero Data Retention** in Vapi's organisation settings. The caller's details keep
 flowing through your tools into your database; only Vapi's own copy of the call goes away. Make one
@@ -300,7 +325,8 @@ effect of Zero Data Retention, not a fault.
 | Rotate the webhook secret | `npx wrangler secret put WEBHOOK_SECRET` and update the Vapi credential **at the same time**: calls fail in between |
 | Rotate another key | `npx wrangler secret put <NAME>`; it takes effect without a separate deploy |
 | Back up the database | `npx wrangler d1 export open-receptionist --remote --output backup.sql`; D1's point-in-time restore also covers recent days, depending on your plan |
-| Watch costs | Vapi minutes, Brevo credits, the number's rental |
+| Find failed messages | the daily check emails them; to look yourself: `npx wrangler d1 execute open-receptionist --remote --command "SELECT call_id, deliveries FROM calls WHERE deliveries LIKE '%failed%' ORDER BY updated_at DESC LIMIT 20"` |
+| Watch costs | Vapi minutes, Brevo credits (the daily check warns below 20), the number's rental |
 
 ## 9. Limits of this version
 

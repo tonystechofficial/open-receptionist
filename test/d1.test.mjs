@@ -2,7 +2,7 @@
 // wrapper shaped like a D1 binding. D1 is SQLite, so this catches SQL mistakes before a deploy.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { d1Store } from '../src/db/d1.mjs';
 import * as H from '../src/server/handlers.mjs';
 import { validateClientConfig } from '../src/core/config.mjs';
@@ -17,7 +17,11 @@ const skip = DatabaseSync ? false : 'node:sqlite is not available in this Node v
 
 async function d1Binding() {
   const db = new DatabaseSync(':memory:');
-  db.exec(await readFile(new URL('../migrations/0001_init.sql', import.meta.url), 'utf8'));
+  // Every migration, in order, as `wrangler d1 migrations apply` does.
+  const dir = new URL('../migrations/', import.meta.url);
+  for (const file of (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()) {
+    db.exec(await readFile(new URL(file, dir), 'utf8'));
+  }
   return {
     prepare(sql) {
       const stmt = db.prepare(sql);
@@ -104,4 +108,24 @@ test('a whole call runs on the D1 schema: offer, book, recap once', { skip }, as
   const record = await deps.store.getCall('call_1');
   assert.equal(record.status, 'rdv');
   assert.ok(record.recapSentAt);
+});
+
+test('what was sent to whom is kept with the call', { skip }, async () => {
+  const store = d1Store(await d1Binding());
+  const deliveries = {
+    callerSms: { status: 'failed', to: '+33612345678', reason: 'brevo sms 401', at: '2026-10-23T08:00:00.000Z' },
+    recap: { email: { status: 'sent', at: '2026-10-23T08:05:00.000Z' }, sms: [] },
+  };
+  await store.upsertCall('c3', { deliveries });
+  await store.upsertCall('c3', { status: 'rdv' });
+  assert.deepEqual((await store.getCall('c3')).deliveries, deliveries);
+  assert.equal((await store.getCall('c3')).status, 'rdv');
+});
+
+test('the daily check reads only the calls updated since a given instant', { skip }, async () => {
+  const store = d1Store(await d1Binding());
+  const before = new Date(Date.now() - 1000).toISOString();
+  await store.upsertCall('c4', { status: 'a_rappeler' });
+  assert.deepEqual((await store.callsUpdatedSince(before)).map((c) => c.callId), ['c4']);
+  assert.deepEqual(await store.callsUpdatedSince(new Date(Date.now() + 60_000).toISOString()), []);
 });

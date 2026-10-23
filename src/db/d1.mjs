@@ -1,5 +1,5 @@
 // Cloudflare D1 store adapter. Same interface as src/db/store.mjs (see the comment there), backed
-// by migrations/0001_init.sql. D1 is a Workers binding, so the database handle is passed in.
+// by the migrations in migrations/. D1 is a Workers binding, so the database handle is passed in.
 // D1 rejects `undefined` as a bound value, so every optional value goes through `v()`.
 
 const v = (x) => (x === undefined ? null : x);
@@ -21,21 +21,21 @@ export function d1Store(db) {
       await db
         .prepare(
           `INSERT INTO calls (call_id, nom, besoin, urgence, telephone, email, complet, status, urgent, offered,
-             summary, note, ended_at, ended_reason, recap_sent_at, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             summary, note, ended_at, ended_reason, recap_sent_at, deliveries, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(call_id) DO UPDATE SET
              nom = excluded.nom, besoin = excluded.besoin, urgence = excluded.urgence,
              telephone = excluded.telephone, email = excluded.email, complet = excluded.complet,
              status = excluded.status, urgent = excluded.urgent, offered = excluded.offered,
              summary = excluded.summary, note = excluded.note, ended_at = excluded.ended_at,
              ended_reason = excluded.ended_reason, recap_sent_at = excluded.recap_sent_at,
-             updated_at = excluded.updated_at`,
+             deliveries = excluded.deliveries, updated_at = excluded.updated_at`,
         )
         .bind(
           callId, v(c.nom), v(c.besoin), v(c.urgence), v(c.telephone), v(c.email), c.complet ? 1 : 0,
           v(next.status), next.urgent ? 1 : 0, next.offered ? JSON.stringify(next.offered) : null,
           v(next.summary), v(next.note), v(next.endedAt), v(next.endedReason), v(next.recapSentAt),
-          next.createdAt, now,
+          next.deliveries ? JSON.stringify(next.deliveries) : null, next.createdAt, now,
         )
         .run();
       return next;
@@ -61,6 +61,11 @@ export function d1Store(db) {
       return row ? appointmentFromRow(row) : null;
     },
 
+    async callsUpdatedSince(iso) {
+      const rows = (await db.prepare('SELECT * FROM calls WHERE updated_at >= ? ORDER BY updated_at').bind(iso).all())?.results ?? [];
+      return rows.map(callFromRow);
+    },
+
     async all() {
       const calls = (await db.prepare('SELECT * FROM calls ORDER BY created_at DESC').all())?.results ?? [];
       const appointments = (await db.prepare('SELECT * FROM appointments ORDER BY at').all())?.results ?? [];
@@ -84,6 +89,7 @@ function callFromRow(r) {
     endedAt: r.ended_at,
     endedReason: r.ended_reason,
     recapSentAt: r.recap_sent_at,
+    deliveries: r.deliveries ? JSON.parse(r.deliveries) : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

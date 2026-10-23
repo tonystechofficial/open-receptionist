@@ -4,6 +4,7 @@
 import { handleVapiMessage } from '../src/server/handlers.mjs';
 import { fallbackResponse } from '../src/server/fallback.mjs';
 import { validateClientConfig } from '../src/core/config.mjs';
+import { deliveryProblems, alertEmail } from '../src/core/alerts.mjs';
 import { calcom } from '../src/providers/calendar/calcom.mjs';
 import { resend } from '../src/providers/notify/resend.mjs';
 import { brevoSms } from '../src/providers/notify/brevo-sms.mjs';
@@ -11,12 +12,22 @@ import { d1Store } from '../src/db/d1.mjs';
 
 // One endpoint for everything Vapi posts. The two older paths stay as aliases.
 const WEBHOOK_PATHS = new Set(['/api/vapi', '/api/tools', '/api/call-report']);
+const DAY_MS = 86_400_000;
+const LOW_SMS_CREDITS = 20; // about ten bookings: a confirmation and a recap each
 
 export function createWorker({ makeStore = (env) => d1Store(env.DB) } = {}) {
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
       if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true });
+      // The daily check on demand, to verify a setup: same secret as the webhook, nothing is emailed.
+      if (url.pathname === '/api/check') {
+        if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
+        if (!env.WEBHOOK_SECRET || request.headers.get('x-vapi-secret') !== env.WEBHOOK_SECRET) {
+          return json({ error: 'bad secret' }, 401);
+        }
+        return json(await runCheck(env, makeStore));
+      }
       if (!WEBHOOK_PATHS.has(url.pathname)) return json({ error: 'not found' }, 404);
       if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405);
       if (env.WEBHOOK_SECRET && request.headers.get('x-vapi-secret') !== env.WEBHOOK_SECRET) {
@@ -32,13 +43,19 @@ export function createWorker({ makeStore = (env) => d1Store(env.DB) } = {}) {
         return json(fallbackResponse(message)); // still a 200: Vapi ignores tool results on other codes
       }
     },
+
+    // Cron trigger ([triggers] in wrangler.toml): the daily check, emailed only when something is wrong.
+    async scheduled(controller, env, ctx) {
+      ctx.waitUntil(dailyCheck(env, makeStore));
+    },
   };
 }
 
 export default createWorker();
 
 export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
-  const { ok, errors, config } = validateClientConfig({
+  const providers = { email: Boolean(env.RESEND_API_KEY), sms: Boolean(env.BREVO_API_KEY) };
+  const { ok, errors, warnings, config } = validateClientConfig({
     company: env.CLIENT_COMPANY,
     metier: env.CLIENT_METIER,
     horaires: env.CLIENT_HORAIRES,
@@ -48,7 +65,7 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
     confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
     calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
     notify: { email: splitList(env.NOTIFY_EMAIL), sms: splitList(env.NOTIFY_SMS) },
-  });
+  }, { providers });
   if (!ok) throw new Error(`invalid client config: ${errors.join('; ')}`);
 
   const calendar = calcom({
@@ -59,9 +76,67 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
   });
   const notify = {};
   if (env.RESEND_API_KEY) notify.email = resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }).sendEmail;
-  if (env.BREVO_API_KEY) notify.sms = brevoSms({ apiKey: env.BREVO_API_KEY, sender: env.SMS_SENDER || undefined }).sendSms;
+  if (env.BREVO_API_KEY) notify.sms = brevoSms({ apiKey: env.BREVO_API_KEY, sender: config.smsSender }).sendSms;
 
-  return { calendar, notify, store: makeStore(env), config };
+  return { calendar, notify, store: makeStore(env), config, warnings };
+}
+
+/**
+ * Everything that would keep a call from reaching the owner: a configuration the webhook refuses,
+ * an SMS key Brevo refuses (its IP lock, on by default for new accounts, blocks a Worker), SMS
+ * credits running out, and every delivery that failed in the last 24 hours.
+ */
+export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new Date()) {
+  const problems = [];
+  let deps = null;
+  try {
+    deps = buildDeps(env, makeStore);
+    problems.push(...deps.warnings.map((w) => `Configuration : ${w}`));
+  } catch (error) {
+    problems.push(`Configuration refusée, chaque appel reçoit une promesse de rappel : ${error.message}`);
+  }
+
+  if (env.BREVO_API_KEY) {
+    try {
+      const { smsCredits } = await brevoSms({ apiKey: env.BREVO_API_KEY }).check();
+      if (smsCredits !== null && smsCredits < LOW_SMS_CREDITS) {
+        problems.push(`Crédits SMS Brevo presque épuisés : ${smsCredits} restants.`);
+      }
+    } catch (error) {
+      const hint = /IP address/i.test(error.message)
+        ? ' Brevo bloque les adresses IP inconnues : dans Brevo, Sécurité > IP autorisées, désactiver le blocage.'
+        : '';
+      problems.push(`Brevo refuse la clé SMS : ${clip(error.message)}.${hint}`);
+    }
+  }
+
+  try {
+    const store = deps?.store ?? makeStore(env);
+    problems.push(...deliveryProblems(await store.callsUpdatedSince(new Date(now.getTime() - DAY_MS).toISOString())));
+  } catch (error) {
+    problems.push(`Base de données illisible : ${clip(error.message)}`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
+/** Run the check and email the problems to ALERT_EMAIL, or else to the first NOTIFY_EMAIL. */
+async function dailyCheck(env, makeStore) {
+  const report = await runCheck(env, makeStore);
+  if (report.ok) return report;
+  console.error('[open-receptionist] daily check:', report.problems.join(' | '));
+  const to = env.ALERT_EMAIL || splitList(env.NOTIFY_EMAIL)[0];
+  if (!env.RESEND_API_KEY || !to) return report;
+  try {
+    const mail = alertEmail({ company: env.CLIENT_COMPANY || 'open-receptionist', problems: report.problems });
+    await resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }).sendEmail({ to, ...mail });
+  } catch (error) {
+    console.error('[open-receptionist] alert email failed', error);
+  }
+  return report;
+}
+
+function clip(s) {
+  return String(s).slice(0, 300);
 }
 
 function splitList(s) {

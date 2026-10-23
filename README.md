@@ -27,12 +27,14 @@ Maintained by Tony's Tech. MIT licensed.
 
 - `src/core/` — pure, tested decisions: `qualify` (clean up what the caller said), `slots` (what to
   offer and how to say it in French, in Paris time), `messages` (the caller SMS and the owner recap),
+  `phone` (normalising numbers, mobiles only for SMS), `alerts` (what the daily check reports),
   `booking`, `config`.
 - `src/server/handlers.mjs` — the call flows, described in plain words in [docs/FLOWS.md](docs/FLOWS.md).
 - `src/providers/` — adapters behind small interfaces: `voice/` (Vapi; Retell stub), `calendar/`
   (Cal.com; Google stub), `notify/` (Resend email, Brevo SMS).
 - `src/db/` — the store: Cloudflare D1 for the Worker, memory or a JSON file for local runs.
-- `worker/` — the Cloudflare Worker entry; `api/` — the Vercel entry. Same flows behind both.
+- `worker/` — the Cloudflare Worker entry, with a daily cron check that emails failed messages and a
+  refused SMS key; `api/` — the Vercel entry. Same flows behind both.
 - `vapi/create-assistant.mjs` — builds the Vapi assistant from a client config and pushes it.
 
 ## One template, many clients
@@ -46,14 +48,15 @@ A new client is a new config, not new code. See `config/client.example.json`:
   "telephone": "05 56 12 34 56",
   "calendar": { "provider": "calcom", "id": "123456" },
   "notify": { "email": ["contact@plomberie-dupont.fr"], "sms": ["33612345678"] },
-  "urgences": "Odeur de gaz : ... Urgence Sécurité Gaz au 0 800 47 33 33 ..."
+  "smsSender": "Dupont",
+  "urgences": "Odeur de gaz : ... le 05 56 79 41 00 de Régaz-Bordeaux ..., sinon Urgence Sécurité Gaz au 0 800 47 33 33 ..."
 }
 ```
 
 ## Quickstart
 
 ```bash
-npm test     # 88 tests: core, flows, D1 SQL on SQLite, Worker routing. No dependencies, no keys.
+npm test     # 126 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -106,8 +109,8 @@ Records live in **your** database; the voice platform is told to keep only metad
 
 ## Status
 
-- **Tested:** the core decisions, every call flow end to end with fakes, the D1 migration and SQL on
-  real SQLite, and the Worker's routing, authentication and fallback (88 tests).
+- **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
+  real SQLite, and the Worker's routing, authentication, fallback and daily check (126 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

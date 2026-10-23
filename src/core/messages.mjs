@@ -39,7 +39,7 @@ function truncate(s, n) {
   return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
 }
 
-function escapeHtml(s) {
+export function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
 

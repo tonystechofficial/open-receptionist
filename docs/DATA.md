@@ -18,12 +18,14 @@ there, during the call. That never depends on the platform's own data features.
 
 ## What our database keeps
 
-Two tables, created by `migrations/0001_init.sql` in Cloudflare D1:
+Two tables, created by the numbered files in `migrations/` in Cloudflare D1:
 
 - **`calls`**, one row per call, keyed by the platform's call id: name, need, urgency, phone
   (international form), email, whether the details are complete, the status (`rdv` or
   `a_rappeler`), the urgent flag, the two slots offered as options 1 and 2, the platform's summary,
-  a note when the calendar failed, and `recap_sent_at`.
+  a note when the calendar failed, `recap_sent_at`, and `deliveries`: what was sent to whom after
+  the call (the caller's confirmation SMS, the owner's recap by email and by SMS), each marked sent,
+  failed with the provider's message, or skipped with the reason.
 - **`appointments`**, one row per booking: the call it came from, the UTC start, the French label sent
   to the caller, the caller's details and the calendar's booking reference.
 
@@ -31,8 +33,9 @@ Two guarantees come from this shape:
 
 - **One booking per call.** A repeated booking request finds the existing appointment and confirms it
   instead of booking again.
-- **One recap per call.** `recap_sent_at` is set after the owner recap goes out, so a redelivered
-  end-of-call report sends nothing.
+- **One recap per call.** `recap_sent_at` is set once the owner recap reached at least one
+  recipient, so a redelivered end-of-call report sends nothing. A recap that reached nobody leaves it
+  unset: a redelivered report tries again, and the daily check reports it.
 
 ## What the platform keeps
 

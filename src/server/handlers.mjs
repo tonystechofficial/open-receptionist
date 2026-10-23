@@ -5,6 +5,7 @@
 import { qualify, mergeCaller } from '../core/qualify.mjs';
 import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant, withoutSlot } from '../core/slots.mjs';
 import { confirmationSms, ownerRecap } from '../core/messages.mjs';
+import { canReceiveSms } from '../core/phone.mjs';
 import * as vapi from '../providers/voice/vapi.mjs';
 
 const DAY_MS = 86_400_000;
@@ -41,7 +42,8 @@ export async function handleToolCall(message, deps) {
 
 /**
  * End of call: merge what the tools captured with Vapi's analysis, record the call in OUR
- * database, and send the owner one recap. A redelivered report is recognised and not resent.
+ * database, and send the owner one recap. A redelivered report is recognised and not resent,
+ * unless the first recap reached nobody. What each channel did is kept in `deliveries`.
  */
 export async function handleCallReport(message, deps) {
   if (!vapi.isEndOfCall(message)) return { ignored: true };
@@ -72,9 +74,13 @@ export async function handleCallReport(message, deps) {
     endedAt: message.endedAt ?? ctx.now.toISOString(),
     endedReason: message.endedReason ?? null,
   });
-  await sendOwnerRecap(recap, ctx);
-  await store.upsertCall(ctx.callId, { recapSentAt: ctx.now.toISOString() });
-  return { ok: true, callId: ctx.callId };
+  const sent = await sendOwnerRecap(recap, ctx);
+  const reached = sent.email.status === 'sent' || sent.sms.some((s) => s.status === 'sent');
+  await store.upsertCall(ctx.callId, {
+    deliveries: { ...(existing?.deliveries ?? {}), recap: sent },
+    ...(reached ? { recapSentAt: ctx.now.toISOString() } : {}),
+  });
+  return { ok: true, callId: ctx.callId, recapSent: reached };
 }
 
 // ---------------------------------------------------------------- tools
@@ -144,9 +150,10 @@ async function book(args, ctx) {
   const written = formatSlotFr(at, ctx.now, { timeZone: ctx.timeZone, style: 'written' });
   await store.saveAppointment({ callId: ctx.callId, at, label: written, caller, bookingRef: bookingRef(booking), createdAt: ctx.now.toISOString() });
   await store.upsertCall(ctx.callId, { caller, status: 'rdv' });
-  const smsSent = await confirmToCaller(caller, written, ctx);
+  const sms = await confirmToCaller(caller, written, ctx);
+  await store.upsertCall(ctx.callId, { deliveries: { ...(existing?.deliveries ?? {}), callerSms: sms } });
   const spoken = formatSlotFr(at, ctx.now, { timeZone: ctx.timeZone });
-  return `Rendez-vous confirmé pour ${spoken}.${smsSent ? " Dis à l'appelant qu'il va recevoir un SMS de confirmation." : ''} Demande-lui s'il a une autre question, puis conclus.`;
+  return `Rendez-vous confirmé pour ${spoken}.${sms.status === 'sent' ? " Dis à l'appelant qu'il va recevoir un SMS de confirmation." : ''} Demande-lui s'il a une autre question, puis conclus.`;
 }
 
 /** A refused booking is either a slot someone else just took (re-offer) or an outage (call-back). */
@@ -221,41 +228,67 @@ function resolveChoice(creneau, offered, now) {
   return Number.isFinite(ms) && ms > now.getTime() ? value : null;
 }
 
+// A delivery is { status: 'sent' | 'failed' | 'skipped', to?, reason?, at }. It is stored on the call,
+// so a refused SMS leaves a trace that the daily check reports, not just a log line.
+
+/** The caller's confirmation SMS. Only a mobile can receive it: a landline caller is not promised one. */
 async function confirmToCaller(caller, label, ctx) {
-  if (ctx.config.confirmation?.sms === false) return false;
-  if (!ctx.deps.notify?.sms || !caller.telephone) return false;
+  const at = ctx.now.toISOString();
+  const to = caller.telephone;
+  if (ctx.config.confirmation?.sms === false) return { status: 'skipped', reason: 'confirmation par SMS désactivée', at };
+  if (!ctx.deps.notify?.sms) return { status: 'skipped', reason: 'aucun fournisseur SMS', at };
+  if (!to) return { status: 'skipped', reason: 'aucun numéro', at };
+  if (!canReceiveSms(to)) return { status: 'skipped', to, reason: 'numéro fixe ou spécial, qui ne reçoit pas de SMS', at };
   try {
     await ctx.deps.notify.sms({
-      to: caller.telephone,
+      to,
       content: confirmationSms({ company: ctx.company, label, contactPhone: ctx.config.telephone }),
       sender: ctx.config.smsSender,
     });
-    return true;
+    return { status: 'sent', to, at };
   } catch (error) {
     ctx.log('caller sms failed', error);
-    return false;
+    return { status: 'failed', to, reason: reasonOf(error), at };
   }
 }
 
+/** The owner's recap by email (the record) and by SMS (on top). Returns what each channel did. */
 async function sendOwnerRecap(recap, ctx) {
   const to = ctx.config.notify ?? {};
   const notify = ctx.deps.notify ?? {};
-  if (notify.email && to.email?.length) {
+  const at = ctx.now.toISOString();
+  const sent = { email: null, sms: [] };
+
+  if (!to.email?.length) sent.email = { status: 'skipped', reason: 'aucun destinataire email', at };
+  else if (!notify.email) sent.email = { status: 'failed', reason: 'aucun fournisseur email (RESEND_API_KEY)', at };
+  else {
     try {
       await notify.email({ to: to.email, subject: recap.subject, text: recap.text, html: recap.html });
+      sent.email = { status: 'sent', at };
     } catch (error) {
       ctx.log('owner email failed', error);
+      sent.email = { status: 'failed', reason: reasonOf(error), at };
     }
   }
-  if (notify.sms && to.sms?.length) {
-    for (const number of to.sms) {
-      try {
-        await notify.sms({ to: number, content: recap.sms, sender: ctx.config.smsSender });
-      } catch (error) {
-        ctx.log('owner sms failed', error);
-      }
+
+  for (const number of to.sms ?? []) {
+    if (!notify.sms) {
+      sent.sms.push({ status: 'skipped', to: number, reason: 'aucun fournisseur SMS', at });
+      continue;
+    }
+    try {
+      await notify.sms({ to: number, content: recap.sms, sender: ctx.config.smsSender });
+      sent.sms.push({ status: 'sent', to: number, at });
+    } catch (error) {
+      ctx.log('owner sms failed', error);
+      sent.sms.push({ status: 'failed', to: number, reason: reasonOf(error), at });
     }
   }
+  return sent;
+}
+
+function reasonOf(error) {
+  return String(error?.message ?? error).slice(0, 300);
 }
 
 function clampDays(jours) {

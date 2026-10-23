@@ -19,12 +19,18 @@ CLIENT_METIER = "plomberie"
 CLIENT_HORAIRES = "du lundi au vendredi, de 8 h a 18 h"
 CLIENT_TELEPHONE = "05 56 12 34 56"   # given to the caller in the confirmation SMS
 TIME_ZONE = "Europe/Paris"
-NOTIFY_EMAIL = "contact@plomberie-dupont.fr"
-NOTIFY_SMS = "33612345678"
+NOTIFY_EMAIL = "contact@plomberie-dupont.fr"   # required: the email recap is the record of every call
+NOTIFY_SMS = "06 12 34 56 78"         # optional: mobiles (06, 07) for the SMS recap, comma-separated
 CONFIRM_CALLER_SMS = "true"           # "false" to stop texting the caller after a booking
 CALCOM_EVENT_TYPE_ID = "123456"
 MAIL_FROM = "Accueil <accueil@your-domain.fr>"
-SMS_SENDER = "Accueil"                # 3 to 11 letters or digits
+SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 letters or digits; carriers filter "Info" or "Accueil"
+# ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily check's alerts; defaults to the first NOTIFY_EMAIL
 # Only if Cal.com moves its API versions again (defaults: slots 2024-09-04, bookings 2026-02-25):
 # CALCOM_SLOTS_API_VERSION = "2024-09-04"
 # CALCOM_BOOKINGS_API_VERSION = "2026-02-25"
+
+# The daily check: configuration, the SMS key and credits, and every delivery that failed in the last
+# 24 hours. Problems are emailed to ALERT_EMAIL. 06:00 UTC is 7 or 8 a.m. in Paris.
+[triggers]
+crons = ["0 6 * * *"]

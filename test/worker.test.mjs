@@ -70,3 +70,79 @@ test('a broken configuration still answers 200 with a call-back instruction per 
   assert.equal(body.results[0].toolCallId, 'tc_1');
   assert.match(body.results[0].result, /rappelle/);
 });
+
+// The daily check (cron) and its manual twin, GET /api/check. Brevo and Resend are fake fetches.
+const CHECK_ENV = { ...ENV, BREVO_API_KEY: 'brevo-key', RESEND_API_KEY: 'resend-key', MAIL_FROM: 'Accueil <a@dupont.fr>', SMS_SENDER: 'Dupont', ALERT_EMAIL: 'tony@example.fr' };
+
+async function withFakeApis({ brevoStatus = 200, smsCredits = 100 } = {}, fn) {
+  const previous = globalThis.fetch;
+  const mails = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u === 'https://api.brevo.com/v3/account') {
+      return brevoStatus === 200
+        ? new Response(JSON.stringify({ plan: [{ type: 'sms', creditsType: 'sendLimit', credits: smsCredits }] }), { status: 200 })
+        : new Response(JSON.stringify({ code: 'unauthorized', message: 'We have detected you are using an unrecognised IP address 104.28.0.1' }), { status: brevoStatus });
+    }
+    if (u === 'https://api.resend.com/emails') {
+      mails.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ id: 'm1' }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  };
+  try { return await fn(mails); } finally { globalThis.fetch = previous; }
+}
+
+async function runScheduled(w, env) {
+  const pending = [];
+  await w.scheduled({ cron: '0 6 * * *', scheduledTime: Date.now() }, env, { waitUntil: (p) => pending.push(p) });
+  await Promise.all(pending);
+}
+
+test('the daily check emails an alert when Brevo refuses the SMS key', async () => {
+  await withFakeApis({ brevoStatus: 401 }, async (mails) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), CHECK_ENV);
+    assert.equal(mails.length, 1);
+    assert.deepEqual(mails[0].to, ['tony@example.fr']);
+    assert.match(mails[0].subject, /Plomberie Dupont/);
+    assert.match(mails[0].text, /401/);
+    assert.match(mails[0].text, /unrecognised IP address/);
+  });
+});
+
+test('the daily check warns when the SMS credits run low', async () => {
+  await withFakeApis({ smsCredits: 3 }, async (mails) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), CHECK_ENV);
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].text, /crédits SMS[^\n]*\b3\b/i);
+  });
+});
+
+test('the daily check stays quiet when everything works', async () => {
+  await withFakeApis({}, async (mails) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), CHECK_ENV);
+    assert.equal(mails.length, 0);
+  });
+});
+
+test('the daily check reports a configuration that refuses every call', async () => {
+  await withFakeApis({}, async (mails) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), { ...CHECK_ENV, SMS_SENDER: '' });
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].text, /smsSender/);
+  });
+});
+
+test('GET /api/check needs the webhook secret and returns the problems without emailing', async () => {
+  await withFakeApis({ brevoStatus: 401 }, async (mails) => {
+    const w = createWorker({ makeStore: () => memoryStore() });
+    const refusedRes = await w.fetch(new Request('https://w.example/api/check'), CHECK_ENV);
+    assert.equal(refusedRes.status, 401);
+    const res = await w.fetch(new Request('https://w.example/api/check', { headers: { 'x-vapi-secret': 's3cret' } }), CHECK_ENV);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, false);
+    assert.ok(body.problems.some((p) => p.includes('401')), body.problems.join('\n'));
+    assert.equal(mails.length, 0);
+  });
+});

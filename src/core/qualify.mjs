@@ -1,4 +1,5 @@
 // Pure qualification of what a caller said. No DB, no network: testable in isolation.
+import { normalizePhone } from './phone.mjs';
 
 const IMMEDIATE = [
   'fuite', 'inond', 'urgent', 'tout de suite', 'immédiat', 'immediat', 'maintenant',
@@ -18,16 +19,6 @@ function level(s) {
   return 'normale';
 }
 
-/** Normalize a phone number to a loose E.164. Returns null if clearly not a number. */
-function normPhone(p) {
-  if (!p) return null;
-  const d = String(p).replace(/[^\d+]/g, '');
-  if (d.startsWith('+')) return d.length >= 11 ? d : null;
-  if (d.startsWith('0') && d.length === 10) return '+33' + d.slice(1); // FR mobile/landline
-  if (d.length >= 11) return '+' + d;
-  return null;
-}
-
 function normEmail(e) {
   if (!e) return null;
   const t = String(e).trim().toLowerCase().replace(/\s+/g, '');
@@ -41,7 +32,7 @@ function normEmail(e) {
 export function qualify(raw = {}) {
   const nom = (raw.nom || '').trim();
   const besoin = (raw.besoin || '').trim();
-  const telephone = normPhone(raw.telephone);
+  const telephone = normalizePhone(raw.telephone);
   const email = normEmail(raw.email);
   // Urgency comes from the level the agent states and from the words of the need; the higher wins,
   // so "normale" from the agent never hides a "fuite" in the description.

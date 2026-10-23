@@ -5,10 +5,12 @@
 //   upsertCall(callId, patch)        -> merged call record (created on first write)
 //   saveAppointment(appointment)     -> appointment ({ callId, at, label, caller, bookingRef, createdAt })
 //   findAppointmentByCallId(callId)  -> appointment or null
+//   callsUpdatedSince(iso)           -> calls updated at or after that instant (the daily check)
 //   all()                            -> { calls, appointments }
 // A call record holds { callId, caller, offered, status, urgent, summary, note, endedAt,
-// endedReason, recapSentAt, createdAt, updatedAt }. Stores stay dumb: merging the caller's
-// details is the handlers' job (mergeCaller), the store just keeps what it is given.
+// endedReason, recapSentAt, deliveries, createdAt, updatedAt }, `deliveries` being what was sent to
+// whom and what failed. Stores stay dumb: merging the caller's details is the handlers' job
+// (mergeCaller), the store just keeps what it is given.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -30,6 +32,7 @@ export function memoryStore() {
     },
     async saveAppointment(a) { appointments.push(a); return a; },
     async findAppointmentByCallId(callId) { return appointments.find((a) => a.callId === callId) ?? null; },
+    async callsUpdatedSince(iso) { return [...calls.values()].filter((c) => c.updatedAt >= iso); },
     async all() { return { calls: [...calls.values()], appointments: appointments.slice() }; },
   };
 }
@@ -58,6 +61,7 @@ export function jsonFileStore(path) {
     },
     async saveAppointment(a) { const db = await load(); db.appointments.push(a); await save(db); return a; },
     async findAppointmentByCallId(callId) { return (await load()).appointments.find((a) => a.callId === callId) ?? null; },
+    async callsUpdatedSince(iso) { return Object.values((await load()).calls).filter((c) => c.updatedAt >= iso); },
     async all() { const db = await load(); return { calls: Object.values(db.calls), appointments: db.appointments }; },
   };
 }
