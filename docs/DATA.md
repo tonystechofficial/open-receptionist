@@ -18,7 +18,7 @@ there, during the call. That never depends on the platform's own data features.
 
 ## What our database keeps
 
-Two tables, created by the numbered files in `migrations/` in Cloudflare D1:
+Two tables, created by `migrations/0001_init.sql` in Cloudflare D1:
 
 - **`calls`**, one row per call, keyed by the platform's call id: name, need, urgency, phone
   (international form), email, whether the details are complete, the status (`rdv` or

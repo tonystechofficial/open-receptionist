@@ -90,7 +90,7 @@ The deploy also schedules the **daily check** (`[triggers]` in `wrangler.toml`, 
 24 hours has a problem.
 
 To **update** a running deployment: `git pull`, `npm test`, `npm run db:init` (applies any new
-migration, such as `0002_deliveries.sql`), then `npm run deploy`.
+migration), then `npm run deploy`.
 
 Then on Vapi:
 
