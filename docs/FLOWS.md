@@ -85,8 +85,9 @@ double booking when the model repeats a tool call or the caller changes their mi
 
 ## 8. Cancelling or moving an existing appointment
 
-The agent cannot change an existing booking yet. It records the request with `noter_demande` and says
-the company will call back; the owner recap shows the request.
+The agent does not change an existing booking: a voice cannot prove who is calling, so a caller giving
+someone else's name could cancel that person's appointment. It records the request with
+`noter_demande` and says the company will call back; the owner recap shows the request.
 
 ## 9. A provider fails
 
@@ -188,12 +189,11 @@ record. The Worker enforces the area from `CLIENT_ZONE`; the agent learns it fro
 
 ## Planned, not built
 
-- An owner dashboard served by the Worker: calls and appointments from D1, behind a token.
-- Rescheduling and cancelling by voice: needs a Cal.com booking lookup by phone plus the reschedule API.
 - The Google Calendar adapter (the slot exists in `src/providers/calendar/google.mjs`).
-- Multi-tenant configs stored in D1, routed by assistant id or called number.
-- A retention job: delete call records after a set period, as RGPD requires a defined retention.
 - Naturalness tuning: an ElevenLabs French voice and Vapi's speaking-plan settings.
+
+Changing a booking by voice, an owner dashboard and several businesses in one deployment are left out
+on purpose: [SPEC.md](SPEC.md) gives the reasons.
 
 ## First real call checklist
 
