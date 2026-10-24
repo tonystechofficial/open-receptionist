@@ -5,6 +5,7 @@
 import { validateClientConfig, configFromVars } from '../../core/config.mjs';
 import { normalizePhone } from '../../core/phone.mjs';
 import { retentionDays } from '../../core/retention.mjs';
+import { parseTransferHours } from '../../core/transfer.mjs';
 
 const EMAIL = /^[^\s@<>,"]+@[^\s@<>,"]+\.[^\s@<>,"]+$/;
 const SENDER = /^([^<>"]*<[^\s@<>,"]+@[^\s@<>,"]+\.[^\s@<>,"]+>|[^\s@<>,"]+@[^\s@<>,"]+\.[^\s@<>,"]+)$/;
@@ -31,6 +32,12 @@ export const QUESTIONS = [
     key: 'CLIENT_HORAIRES', title: 'Opening hours',
     help: 'In words, as the receptionist reads them out. Empty: it gives no hours.',
     example: 'du lundi au vendredi, de 8 h à 18 h',
+  },
+  {
+    key: 'TRANSFER_HOURS', fields: ['transfert.horaires'], title: 'When calls may be put through to you',
+    help: 'An emergency, or a caller who asks for a person, is put through to transfert.numero of config/client.json (step 4.2), only within these hours, Paris time; nobody answers, and the request is noted for a call-back. Empty: at any hour, night included. Without that number, no call is ever put through.',
+    example: 'lun-ven 8h-18h; sam 9h-12h',
+    check: (v) => parseTransferHours(v).error ?? null,
   },
   {
     key: 'CLIENT_TELEPHONE', contact: true, title: 'Number callers ring to change an appointment',

@@ -350,3 +350,12 @@ test('the Worker reads the service area and the rates page from its settings', (
   assert.deepEqual(deps.config.infos.zone, ['Bordeaux', 'Mérignac']);
   assert.equal(deps.config.infos.tarifsUrl, 'https://plomberie-dupont.fr/tarifs');
 });
+
+test('the daily check reports transfer hours it cannot read, while the calls go on', async () => {
+  await withFakeApis({}, async (mails) => {
+    await runScheduled(createWorker({ makeStore: () => memoryStore() }), { ...CHECK_ENV, TRANSFER_HOURS: 'tous les jours' });
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].text, /transfert\.horaires/);
+  });
+  assert.ok(buildDeps({ ...ENV, TRANSFER_HOURS: 'tous les jours' }, () => memoryStore()).config);
+});

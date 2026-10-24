@@ -375,3 +375,34 @@ test('a booking in the area carries the address to the calendar and the rates li
   await H.handleCallReport(endOfCall(), deps);
   assert.match(sent.email[0].text, /Adresse : 12 rue des Lilas, Mérignac/);
 });
+
+// Transfer to the business (2026-10-25). NOW is a Thursday, 9 h in Paris.
+const TRANSFER = { transfert: { numero: '06 00 00 00 02', horaires: 'lun-ven 8h-18h' } };
+
+test('an emergency within the transfer hours is put through to the business', async () => {
+  const { deps } = setup({ config: TRANSFER });
+  const out = await H.handleToolCall(tool('demander_transfert', { motif: 'urgence' }), deps);
+  assert.match(first(out).result, /appelle transferCall/);
+  assert.match(first(out).result, /Si personne ne répond/);
+});
+
+test('a caller asking for a person is put through too', async () => {
+  const { deps } = setup({ config: TRANSFER });
+  const out = await H.handleToolCall(tool('demander_transfert', { motif: 'demande_appelant' }), deps);
+  assert.match(first(out).result, /appelle transferCall/);
+});
+
+test('outside the transfer hours, the emergency is noted for a call-back instead', async () => {
+  const { deps } = setup({ config: { transfert: { numero: '06 00 00 00 02', horaires: 'sam 9h-12h' } } });
+  const out = await H.handleToolCall(tool('demander_transfert', { motif: 'urgence' }), deps);
+  assert.doesNotMatch(first(out).result, /appelle transferCall/);
+  assert.match(first(out).result, /noter_demande/);
+  assert.match(first(out).result, /urgence immédiate/);
+});
+
+test('any other reason gets no transfer', async () => {
+  const { deps } = setup({ config: TRANSFER });
+  const out = await H.handleToolCall(tool('demander_transfert', { motif: 'devis' }), deps);
+  assert.doesNotMatch(first(out).result, /appelle transferCall/);
+  assert.match(first(out).result, /réservé aux urgences/);
+});

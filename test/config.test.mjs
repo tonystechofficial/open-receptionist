@@ -202,3 +202,21 @@ test('business information that could mislead a caller is refused', () => {
     assert.ok(bad.errors.some((e) => e.includes(field)), `${field}: ${bad.errors.join('; ')}`);
   }
 });
+
+// Transfer to the business (2026-10-25): the Worker reads the hours, the assistant the number.
+test('the transfer hours come from TRANSFER_HOURS, and nothing is added without them', () => {
+  assert.deepEqual(configFromVars({ TRANSFER_HOURS: 'lun-ven 8h-18h' }).transfert, { horaires: 'lun-ven 8h-18h' });
+  assert.equal('transfert' in configFromVars({}), false);
+});
+
+test('a transfer number must be a phone number', () => {
+  assert.equal(validateClientConfig({ ...base, transfert: { numero: '06 00 00 00 02', horaires: 'lun-ven 8h-18h' } }).ok, true);
+  const bad = validateClientConfig({ ...base, transfert: { numero: '12' } });
+  assert.ok(bad.errors.some((e) => e.startsWith('transfert.numero')), bad.errors.join('; '));
+});
+
+test('unreadable transfer hours are a warning, not a refusal: the calls go on, without transfers', () => {
+  const out = validateClientConfig({ ...base, transfert: { horaires: 'tous les jours' } });
+  assert.equal(out.ok, true);
+  assert.ok(out.warnings.some((w) => w.startsWith('transfert.horaires') && /lun-ven 8h-18h/.test(w)), out.warnings.join('; '));
+});

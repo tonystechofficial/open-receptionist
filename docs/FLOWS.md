@@ -189,6 +189,28 @@ The town and the address go to the calendar booking's notes, to the owner's reca
 record. The Worker enforces the area from `CLIENT_ZONE`; the agent learns it from `infos.zone` in
 `config/client.json`: keep both lists the same.
 
+## 16. Putting the call through to the business
+
+Only when `config/client.json` gives a number in `transfert.numero`; without it the agent has no way to
+transfer, and every request goes the call-back way.
+
+1. **When.** An immediate emergency, after the safety instructions, or a caller who asks to speak to a
+   person. The agent first calls `demander_transfert` with the reason.
+2. **The webhook decides.** It allows only those two reasons, and only within `TRANSFER_HOURS`, Paris
+   time (`lun-ven 8h-18h; sam 9h-12h30`; empty means any hour, night included). Outside them the agent
+   is told to note the request, urgent if it is, check the number, say the business calls back, and
+   still offer the earliest slot for an emergency. Unreadable hours refuse every transfer and are
+   reported by the daily check; the calls go on.
+3. **The transfer.** The agent says « Je vous mets en relation, ne quittez pas » and Vapi dials the
+   number through Twilio, in warm-transfer mode: a second assistant tells whoever answers who is
+   calling and why, then connects the caller, or cancels on voicemail or a refusal.
+4. **Nobody answers.** A busy or unanswered line brings the caller back: « Je n'ai pas réussi à joindre
+   … », and the agent notes the request for a call-back, which reaches the owner in the recap.
+
+A transferred minute is billed on both legs of the call. Only a real call proves the transfer: whether
+the 5-minute cap applies after the caller is connected, and how long the number rings before Vapi
+gives up, are not documented.
+
 ## Planned, not built
 
 - The Google Calendar adapter (the slot exists in `src/providers/calendar/google.mjs`).

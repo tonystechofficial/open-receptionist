@@ -11,6 +11,7 @@
 // The caller's details are captured by our own noter_demande tool rather than by Vapi's analysis
 // plan, which is migrating to "structured outputs". That keeps the capture portable to Retell & co.
 import { safeEqual } from '../../server/secrets.mjs';
+import { normalizePhone } from '../../core/phone.mjs';
 
 export function isEndOfCall(message) { return message?.type === 'end-of-call-report'; }
 export function getToolCalls(message) { return message?.toolCallList ?? message?.toolCalls ?? []; }
@@ -70,6 +71,9 @@ function systemPrompt(c) {
     `- Sujet sans rapport avec ${c.company} : dis poliment que tu ne peux pas aider sur ce point.`,
     `- Appel abusif, canular ou insultes, ou sujet sans rapport qui continue après ta réponse : dis poliment que tu ne peux pas aider, puis raccroche avec endCall.`,
     `- Ne raccroche jamais pendant une urgence, ni tant que l'appelant pose une question sur ${c.company}.`,
+    ...(normalizePhone(c.transfert?.numero) ? [
+      `- Urgence immédiate, après les consignes de sécurité s'il y en a, ou appelant qui demande à parler à une personne : appelle demander_transfert avec le motif urgence ou demande_appelant et la demande en une phrase. Fais ce que l'outil répond : s'il autorise, annonce la mise en relation puis appelle transferCall. Si personne ne répond, appelle noter_demande, vérifie le numéro de rappel et dis que ${c.company} rappelle au plus vite.`,
+    ] : []),
   ];
   if (c.urgences) {
     lines.push('', "CONSIGNES DE SÉCURITÉ (à donner en premier, avant tout le reste, si la situation correspond)", String(c.urgences).trim());
@@ -114,6 +118,50 @@ function businessInfo(infos) {
     '',
     "INFORMATIONS SUR L'ENTREPRISE (données telles quelles quand l'appelant les demande, jamais récitées en liste ; si une information manque, dis que l'entreprise la donnera)",
     ...facts,
+  ];
+}
+
+/**
+ * Transfer to the business, only when config.transfert.numero is set (docs/FLOWS.md, 16). The agent
+ * first asks our webhook (demander_transfert), which enforces the reason and the hours; then Vapi's
+ * transferCall dials the number in warm-transfer mode: a second assistant briefs whoever answers
+ * and connects the caller, or cancels on voicemail, and a busy or unanswered line brings the caller
+ * back to this agent (fallbackPlan). Checked against Vapi's docs on 2026-10-25:
+ * https://docs.vapi.ai/call-forwarding, https://docs.vapi.ai/calls/assistant-based-warm-transfer
+ */
+function transferTools(c, fn) {
+  const number = normalizePhone(c.transfert?.numero);
+  if (!number) return [];
+  const briefing = `Tu passes un appel client au professionnel de ${c.company}. En une ou deux phrases, dis-lui qui appelle et pourquoi, d'après la conversation, et précise si c'est une urgence. S'il accepte de prendre l'appel, appelle transferSuccessful. Si tu tombes sur une messagerie, un répondeur ou un serveur vocal, ou s'il refuse, appelle transferCancel sans laisser de message.`;
+  return [
+    fn('demander_transfert', "Demande si l'appel peut être passé à l'entreprise. Seulement pour une urgence immédiate, ou un appelant qui demande à parler à une personne.", {
+      type: 'object',
+      required: ['motif'],
+      properties: {
+        motif: { type: 'string', enum: ['urgence', 'demande_appelant'] },
+        resume: { type: 'string', description: "La demande de l'appelant, en une phrase." },
+      },
+    }),
+    {
+      type: 'transferCall',
+      destinations: [{
+        type: 'number',
+        number,
+        description: `Le professionnel de ${c.company}, seulement après que demander_transfert l'a autorisé.`,
+        message: 'Je vous mets en relation, ne quittez pas.',
+        transferPlan: {
+          mode: 'warm-transfer-experimental',
+          transferAssistant: {
+            firstMessage: `Bonjour, ici l'assistant vocal de ${c.company}. J'ai un client en ligne.`,
+            firstMessageMode: 'assistant-speaks-first',
+            maxDurationSeconds: 90,
+            silenceTimeoutSeconds: 20,
+            model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: briefing }] },
+          },
+          fallbackPlan: { message: `Je n'ai pas réussi à joindre ${c.company}. Je note votre demande en priorité.`, endCallEnabled: false },
+        },
+      }],
+    },
   ];
 }
 
@@ -167,6 +215,7 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
         adresse,
       },
     }),
+    ...transferTools(c, fn),
     // Vapi's built-in Hang Up tool: the agent ends a finished or abusive call instead of leaving the
     // line open until the caller hangs up. Without messages of its own, it says endCallMessage.
     { type: 'endCall' },

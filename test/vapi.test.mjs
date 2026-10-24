@@ -114,3 +114,35 @@ test('the tools take the town and the address of the job', () => {
     if (t.function.name === 'verifier_dispos') assert.ok(t.function.parameters.properties.ville);
   }
 });
+
+// Transfer to the business (2026-10-25): only when a number is configured, gated by the webhook,
+// and with a way back to the assistant when nobody answers.
+const { config: withTransfer } = validateClientConfig({
+  company: 'Plomberie Dupont',
+  metier: 'plomberie',
+  calendar: { provider: 'calcom', id: '1' },
+  notify: { email: ['patron@dupont.fr'] },
+  transfert: { numero: '06 00 00 00 02' },
+});
+
+test('without a transfer number, the agent has no way to transfer a call', () => {
+  const a = vapi.buildAssistant(config, { webhookBaseUrl: 'https://w.example', credentialId: 'cred_1' });
+  assert.equal(a.model.tools.some((t) => t.type === 'transferCall'), false);
+  assert.equal(functionTools(a).some((t) => t.function.name === 'demander_transfert'), false);
+  assert.doesNotMatch(a.model.messages[0].content, /demander_transfert/);
+});
+
+test('with one, the agent asks the webhook first, then transfers, and comes back when nobody answers', () => {
+  const a = vapi.buildAssistant(withTransfer, { webhookBaseUrl: 'https://w.example', credentialId: 'cred_1' });
+  const ask = functionTools(a).find((t) => t.function.name === 'demander_transfert');
+  assert.deepEqual(ask.function.parameters.properties.motif.enum, ['urgence', 'demande_appelant']);
+  const [destination] = a.model.tools.find((t) => t.type === 'transferCall').destinations;
+  assert.equal(destination.type, 'number');
+  assert.equal(destination.number, '+33600000002');
+  assert.equal(destination.transferPlan.mode, 'warm-transfer-experimental');
+  assert.equal(destination.transferPlan.fallbackPlan.endCallEnabled, false);
+  const briefing = destination.transferPlan.transferAssistant.model.messages[0].content;
+  assert.match(briefing, /transferSuccessful/);
+  assert.match(briefing, /transferCancel/);
+  assert.match(a.model.messages[0].content, /demander_transfert/);
+});

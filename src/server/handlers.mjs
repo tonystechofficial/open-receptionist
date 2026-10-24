@@ -7,6 +7,7 @@ import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant
 import { confirmationSms, ownerRecap, jobPlace } from '../core/messages.mjs';
 import { normalizePhone, smsRefusal } from '../core/phone.mjs';
 import { inZone } from '../core/zone.mjs';
+import { transferDecision } from '../core/transfer.mjs';
 import { screenIncoming, recordUnroutable } from './screening.mjs';
 import * as vapi from '../providers/voice/vapi.mjs';
 
@@ -49,6 +50,7 @@ export async function handleToolCall(message, deps) {
       if (name === 'verifier_dispos') result = await checkAvailability(args, ctx);
       else if (name === 'prendre_rdv') result = await book(args, ctx);
       else if (name === 'noter_demande') result = await recordRequest(args, ctx);
+      else if (name === 'demander_transfert') result = transferRequest(args, ctx);
       else result = `Outil inconnu : ${name}.`;
     } catch (error) {
       ctx.log('tool failed', name, error);
@@ -233,6 +235,24 @@ function outOfZone(town, ctx) {
 }
 
 // ---------------------------------------------------------------- helpers
+
+/**
+ * Asked before the agent transfers a call (FLOWS 16): only an emergency or a caller asking for a
+ * person, within the transfer hours. Otherwise the request goes the call-back way.
+ */
+function transferRequest(args, ctx) {
+  const hours = ctx.config.transfert?.horaires;
+  const decision = transferDecision({ reason: args.motif, now: ctx.now, hours, timeZone: ctx.timeZone });
+  if (decision.allowed) {
+    return `Transfert autorisé. Dis à l'appelant que tu le mets en relation avec ${ctx.company}, puis appelle transferCall. Si personne ne répond, note la demande avec noter_demande et dis que ${ctx.company} rappelle au plus vite.`;
+  }
+  if (decision.why === 'reason') {
+    return "Le transfert est réservé aux urgences et aux appelants qui demandent à parler à une personne. Continue la conversation sans transférer.";
+  }
+  if (decision.why === 'bad-hours') ctx.log('transfer hours unreadable, transfer refused', hours);
+  const urgent = args.motif === 'urgence';
+  return `Pas de transfert possible maintenant. Appelle noter_demande${urgent ? ' en urgence immédiate (urgence = immediate)' : ''}, vérifie le numéro de rappel et dis que ${ctx.company} rappelle au plus vite.${urgent ? ' Propose quand même le créneau le plus proche.' : ''}`;
+}
 
 function context(message, deps) {
   const config = deps.config ?? {};

@@ -30,6 +30,7 @@ CONFIRM_CALLER_SMS = "true"           # "false" to stop texting the caller after
 CALCOM_EVENT_TYPE_ID = "123456"
 MAIL_FROM = "Accueil <accueil@your-domain.fr>"
 SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 letters or digits, one letter at least; carriers filter "Info" or "Accueil"
+# TRANSFER_HOURS = "lun-ven 8h-18h"  # when an emergency or a caller asking for a person is put through to transfert.numero (config/client.json); empty = any hour
 # ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily report and the flood alert; defaults to the first NOTIFY_EMAIL
 # SMS_COUNTRIES = "33"                # dialling codes that may receive an SMS (France only by default)
 # RETENTION_DAYS = "365"              # records older than this are deleted every morning (30 to 1825)

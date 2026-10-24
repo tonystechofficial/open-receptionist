@@ -1,5 +1,6 @@
 // Per-client configuration: one template assistant + one webhook are driven by this object.
 import { normalizePhone, canReceiveSms } from './phone.mjs';
+import { parseTransferHours } from './transfer.mjs';
 
 const DEFAULTS = {
   language: 'fr',
@@ -35,6 +36,8 @@ export function configFromVars(vars) {
     confirmation: { sms: vars.CONFIRM_CALLER_SMS !== 'false' },
     calendar: { provider: 'calcom', id: vars.CALCOM_EVENT_TYPE_ID },
     notify: { email: list(vars.NOTIFY_EMAIL), sms: list(vars.NOTIFY_SMS) },
+    // The Worker only needs the hours to decide; the number lives in the assistant (config/client.json).
+    ...(vars.TRANSFER_HOURS ? { transfert: { horaires: vars.TRANSFER_HOURS } } : {}),
   };
 }
 
@@ -116,6 +119,15 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   if (infos.tarifsUrl !== undefined && !/^https:\/\/\S+$/.test(String(infos.tarifsUrl))) {
     errors.push('infos.tarifsUrl must be an https:// address');
   }
+
+  // Transfer to the business: a number the agent can dial, and hours the webhook can read. Unreadable
+  // hours only warn: the webhook then refuses every transfer, and the calls go on.
+  const transfert = cfg.transfert ?? {};
+  if (transfert.numero !== undefined && !normalizePhone(transfert.numero)) {
+    errors.push(`transfert.numero: "${transfert.numero}" is not a phone number`);
+  }
+  const hours = transfert.horaires ? parseTransferHours(transfert.horaires) : {};
+  if (hours.error) warnings.push(`transfert.horaires: ${hours.error}; until then, no call is transferred`);
 
   if (providers) {
     const textsCallers = (cfg.confirmation?.sms ?? DEFAULTS.confirmation.sms) !== false;

@@ -34,6 +34,9 @@ business's calendar or a call-back request delivered to the owner.
   the job reaches the calendar and the owner's recap.
 - One booking per call at most. A slot taken between the offer and the booking is never double-booked:
   the caller is offered the next free slots instead.
+- A call is put through to the business only for an emergency or a caller who asks for a person,
+  within the business's transfer hours. When nobody answers, the caller is back with the receptionist
+  and the request reaches the owner as a call-back.
 - When the calendar cannot be read or written, the caller is promised a call-back, never left in
   silence.
 
@@ -118,6 +121,8 @@ business's calendar or a call-back request delivered to the owner.
 
 ## Done-when
 
+- A caller with an emergency during the transfer hours is put through to the business; outside
+  them, or when nobody answers, the request reaches the owner as an urgent call-back.
 - A caller asking for an appointment hears in the first sentence that it is an AI, is offered at most
   two real slots in French, books one, and receives one confirmation SMS on a French mobile; the
   booking appears in the business's calendar, and the owner receives the email recap.

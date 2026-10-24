@@ -139,7 +139,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 246 tests, nothing to install
+npm test        # 265 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -210,6 +210,7 @@ a setting changes, then deploy. Editing the `[vars]` block by hand works too:
 | `MAIL_FROM` | a sender on the verified Resend domain, such as `Accueil <accueil@yourdomain.fr>` |
 | `SMS_SENDER` | the business's short name from step 1.6: 3 to 11 letters or digits with at least one letter, never a generic name such as `Info` or `Accueil`. Required when SMS is on |
 | `ALERT_EMAIL` | who receives the daily check's alerts and the immediate flood alert, usually you. Defaults to the first `NOTIFY_EMAIL` |
+| `TRANSFER_HOURS` | optional: when an emergency or a caller asking for a person may be put through to `transfert.numero` (step 4.2), Paris time, such as `lun-ven 8h-18h; sam 9h-12h30`. Empty: any hour, night included |
 | `RETENTION_DAYS` | optional: how long call records are kept before the daily run deletes them. 365 by default, from 30 to 1825 |
 
 To keep the Worker's logs after each call, also add:
@@ -308,6 +309,8 @@ Fill it with the **same** company, trade, hours, phone and recipients as the `[v
   (`deplacement`, `tauxHoraire`, `forfaits`, `devis`), `paiement`, `faq` and `tarifsUrl`. The agent
   reads them word for word and invents nothing else; see [FLOWS.md](FLOWS.md#15-questions-about-the-business-prices-and-the-service-area);
 - `notify`, `smsSender` and `confirmation`, matching the Worker's settings. `notify.email` is required.
+- `transfert`, optional: `{ "numero": "06 …" }`, the phone that takes an emergency or a caller asking
+  for a person, within `TRANSFER_HOURS` (step 3.3). Without it, no call is ever put through.
 
 `config/client.json` is ignored by git, like `wrangler.toml`. The Worker reads `wrangler.toml` and the assistant script
 reads `config/client.json`, so change both whenever a setting changes.

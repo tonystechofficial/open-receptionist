@@ -130,3 +130,9 @@ test('formats the Worker does not check are checked here', () => {
   assert.ok(check('RETENTION_DAYS', '20'));
   assert.equal(check('RETENTION_DAYS', '730'), null);
 });
+
+test('the transfer hours are checked as the Worker reads them, and may stay empty', () => {
+  assert.match(check('TRANSFER_HOURS', 'tous les jours'), /lun-ven 8h-18h/);
+  assert.equal(check('TRANSFER_HOURS', 'lun-ven 8h-18h; sam 9h-12h'), null);
+  assert.equal(check('TRANSFER_HOURS', ''), null);
+});
