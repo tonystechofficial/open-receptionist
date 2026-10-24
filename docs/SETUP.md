@@ -215,6 +215,8 @@ curl https://open-receptionist.<your-subdomain>.workers.dev/health
 # {"ok":true}
 ```
 
+In PowerShell, type `curl.exe`: plain `curl` there is `Invoke-WebRequest`, which refuses `-H "name: value"`.
+
 To serve it from your own domain instead, open the Worker in the Cloudflare dashboard, go to
 **Settings > Domains & Routes**, and add a custom domain from a zone on your account.
 
@@ -224,6 +226,12 @@ To serve it from your own domain instead, open the Worker in the Cloudflare dash
 curl -H "x-vapi-secret: <the webhook secret>" \
   https://open-receptionist.<your-subdomain>.workers.dev/api/check
 # {"ok":true,"problems":[]}
+```
+
+In PowerShell, on one line:
+
+```powershell
+curl.exe -H "x-vapi-secret: <the webhook secret>" https://open-receptionist.<your-subdomain>.workers.dev/api/check
 ```
 
 This is the check the `[triggers]` cron in `wrangler.toml` runs every morning, run now and without

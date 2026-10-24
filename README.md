@@ -85,7 +85,8 @@ the business's name and only texts verified numbers.
 npx wrangler login
 npx wrangler d1 create open-receptionist --location weur   # paste the id into wrangler.toml
 npm run db:init                                            # applies every file in migrations/
-npx wrangler secret put WEBHOOK_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # your WEBHOOK_SECRET: keep it
+npx wrangler secret put WEBHOOK_SECRET                     # paste it; Vapi gets the same value below
 npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio; or BREVO_API_KEY for Brevo
