@@ -34,7 +34,7 @@ export const QUESTIONS = [
   },
   {
     key: 'CLIENT_TELEPHONE', contact: true, title: 'Number callers ring to change an appointment',
-    help: 'The confirmation SMS gives it. A line the business answers.',
+    help: 'The confirmation SMS ends with « Pour le modifier, appelez le … ». A line where a person answers, since the receptionist does not change bookings: not the Twilio number callers dial to reach the receptionist. Empty: the SMS leaves that sentence out.',
     example: '05 56 00 00 00',
     check: (v) => (normalizePhone(v) ? null : 'give a phone number, such as 05 56 00 00 00'),
   },
