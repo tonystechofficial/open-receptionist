@@ -83,8 +83,12 @@ the business's name and only texts verified numbers.
 
 ```bash
 npx wrangler login
-npx wrangler d1 create open-receptionist --location weur   # paste the id into wrangler.toml
+npx wrangler d1 create open-receptionist --location weur   # prints the new database's database_id
+# in wrangler.toml, put that database_id in place of REPLACE_WITH_D1_DATABASE_ID
+# (`npx wrangler d1 list` shows it again; left as is, db:init fails on .../REPLACE_WITH_D1_DATABASE_ID/query)
 npm run db:init                                            # applies every file in migrations/
+# expect "0001_init.sql ✅": the database now has the calls, appointments and call_attempts tables
+# wrangler.toml now holds this deployment's values: never commit it to a public repository
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # your WEBHOOK_SECRET: keep it
 npx wrangler secret put WEBHOOK_SECRET                     # paste it; Vapi gets the same value below
 npx wrangler secret put CALCOM_API_KEY

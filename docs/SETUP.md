@@ -151,11 +151,17 @@ npx wrangler login
 npx wrangler d1 create open-receptionist --location weur
 ```
 
-Copy the `database_id` printed by the second command into `wrangler.toml`, then create the tables:
+Copy the `database_id` printed by the second command into `wrangler.toml`, in place of
+`REPLACE_WITH_D1_DATABASE_ID` (`npx wrangler d1 list` shows it again). Left as is, the next command
+fails on a request to `.../d1/database/REPLACE_WITH_D1_DATABASE_ID/query`. Then create the tables:
 
 ```bash
 npm run db:init
 ```
+
+It answers `0001_init.sql ✅`, and the database holds the `calls`, `appointments` and `call_attempts`
+tables. From here on, `wrangler.toml` holds this deployment's values (the database id, then the
+`[vars]` of step 3.3): never commit it to a public repository.
 
 ### 3.2 Set the secrets
 
