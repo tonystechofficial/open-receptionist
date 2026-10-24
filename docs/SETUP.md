@@ -139,7 +139,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 224 tests, nothing to install
+npm test        # 232 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -149,23 +149,20 @@ npm test        # 224 tests, nothing to install
 ```bash
 npx wrangler login
 npx wrangler d1 create open-receptionist --jurisdiction eu
+npm run db:id
+npm run db:init
 ```
 
 `--jurisdiction eu` keeps the records stored and processed in the European Union, and it can only be
 set when the database is created. A location hint such as `--location weur` is not enough: Cloudflare
 does not guarantee it ([data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
 
-Copy the `database_id` printed by the second command into `wrangler.toml`, in place of
-`REPLACE_WITH_D1_DATABASE_ID` (`npx wrangler d1 list` shows it again). Left as is, the next command
-fails on a request to `.../d1/database/REPLACE_WITH_D1_DATABASE_ID/query`. Then create the tables:
-
-```bash
-npm run db:init
-```
-
-It answers `0001_init.sql ✅`, and the database holds the `calls`, `appointments` and `call_attempts`
-tables. From here on, `wrangler.toml` holds this deployment's values (the database id, then the
-`[vars]` of step 3.3): never commit it to a public repository.
+`npm run db:id` finds the database by its name with `wrangler d1 list` and writes its id into
+`wrangler.toml`, in place of `REPLACE_WITH_D1_DATABASE_ID`; it warns when the database is not in the EU
+jurisdiction. Without it, `db:init` fails on a request to `.../d1/database/REPLACE_WITH_D1_DATABASE_ID/query`.
+`db:init` then answers `0001_init.sql ✅`, and the database holds the `calls`, `appointments` and
+`call_attempts` tables. From here on, `wrangler.toml` holds this deployment's values (the database
+id, then the `[vars]` of step 3.3): never commit it to a public repository.
 
 ### 3.2 Set the secrets
 

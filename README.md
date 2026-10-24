@@ -69,7 +69,7 @@ once before booking, never quotes a specific job, and books only in the towns se
 ## Quickstart
 
 ```bash
-npm test     # 224 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 232 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -83,9 +83,8 @@ the business's name and only texts verified numbers.
 
 ```bash
 npx wrangler login
-npx wrangler d1 create open-receptionist --jurisdiction eu # EU only, set at creation; prints its database_id
-# in wrangler.toml, put that database_id in place of REPLACE_WITH_D1_DATABASE_ID
-# (`npx wrangler d1 list` shows it again; left as is, db:init fails on .../REPLACE_WITH_D1_DATABASE_ID/query)
+npx wrangler d1 create open-receptionist --jurisdiction eu # EU only, set at creation
+npm run db:id                                              # writes the new database's id into wrangler.toml
 npm run db:init                                            # applies every file in migrations/
 # expect "0001_init.sql ✅": the database now has the calls, appointments and call_attempts tables
 # wrangler.toml now holds this deployment's values: never commit it to a public repository
@@ -250,7 +249,7 @@ Records live in **your** database; the voice platform is told to keep only metad
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
   real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, the flood
   alert, the retention purge, the edge rule's plan, the business information and the service area,
-  and the Worker's routing, authentication, fallback and daily check (224 tests).
+  and the Worker's routing, authentication, fallback and daily check (232 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

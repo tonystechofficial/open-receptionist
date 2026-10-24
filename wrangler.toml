@@ -2,8 +2,9 @@ name = "open-receptionist"
 main = "worker/index.mjs"
 compatibility_date = "2026-09-01"
 
-# Create the database once in the EU jurisdiction (set at creation only), then paste its id here:
+# Create the database once in the EU jurisdiction (set at creation only), then write its id here:
 #   npx wrangler d1 create open-receptionist --jurisdiction eu
+#   npm run db:id
 # Then apply the schema with `npm run db:init` (wrangler d1 migrations apply).
 [[d1_databases]]
 binding = "DB"

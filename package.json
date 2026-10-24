@@ -10,6 +10,7 @@
   "scripts": {
     "test": "node --test",
     "assistant:create": "node vapi/create-assistant.mjs",
+    "db:id": "node scripts/set-database-id.mjs",
     "db:init": "npx wrangler d1 migrations apply open-receptionist --remote",
     "db:init:local": "npx wrangler d1 migrations apply open-receptionist --local",
     "cf:dev": "npx wrangler dev --local",
