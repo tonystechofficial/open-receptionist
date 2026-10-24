@@ -23,9 +23,10 @@ export function planDatabaseId({ toml, databases }) {
     return { error: `No D1 database named ${name} on this account. Create it first: npx wrangler d1 create ${name} --jurisdiction eu` };
   }
   if (!UUID.test(String(db.uuid))) return { error: `wrangler gave an unexpected id for ${name}: ${db.uuid}` };
+  const created = db.created_at ? ` (created ${String(db.created_at).slice(0, 16).replace('T', ' ')} UTC)` : '';
   const warning = db.jurisdiction === 'eu'
     ? undefined
-    : `${name} is not in the EU jurisdiction, so its records are not guaranteed to stay in the EU. Before it holds any record, recreate it: npx wrangler d1 delete ${name}, then npx wrangler d1 create ${name} --jurisdiction eu, then npm run db:id again.`;
+    : `${name}${created} is not in the EU jurisdiction, so its records are not guaranteed to stay in the EU. While it exists, a new \`d1 create ${name}\` fails with "A database with that name already exists". Before it holds any record, recreate it: npx wrangler d1 delete ${name}, then npx wrangler d1 create ${name} --jurisdiction eu, then npm run db:id again.`;
   if (current === db.uuid) return { toml, message: `wrangler.toml already has the id of ${name} (${db.uuid}).`, warning };
   return { toml: toml.replace(ID_LINE, `$1${db.uuid}$3`), message: `wrangler.toml: database_id = "${db.uuid}" (${name}).`, warning };
 }

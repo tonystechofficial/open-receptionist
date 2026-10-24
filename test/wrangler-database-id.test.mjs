@@ -44,10 +44,12 @@ test('when wrangler.toml already has the id, nothing changes', () => {
   assert.match(plan.message, /already/);
 });
 
-test('a database outside the EU jurisdiction is written, with a warning on how to recreate it', () => {
-  const plan = planDatabaseId({ toml: TOML, databases: [{ ...EU, jurisdiction: null }] });
+test('a database outside the EU jurisdiction is written, with a warning saying which one and how to recreate it', () => {
+  const plan = planDatabaseId({ toml: TOML, databases: [{ ...EU, jurisdiction: null, created_at: '2026-10-24T19:55:12.526Z' }] });
   assert.equal(plan.toml, withId(ID));
-  assert.match(plan.warning, /npx wrangler d1 create open-receptionist --jurisdiction eu/);
+  assert.match(plan.warning, /created 2026-10-24 19:55 UTC/);
+  assert.match(plan.warning, /A database with that name already exists/); // why a new `d1 create` fails while it exists
+  assert.match(plan.warning, /npx wrangler d1 delete open-receptionist, then npx wrangler d1 create open-receptionist --jurisdiction eu/);
 });
 
 test('with no database of that name, it says how to create one and writes nothing', () => {
