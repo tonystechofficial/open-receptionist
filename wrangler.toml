@@ -25,8 +25,9 @@ CONFIRM_CALLER_SMS = "true"           # "false" to stop texting the caller after
 CALCOM_EVENT_TYPE_ID = "123456"
 MAIL_FROM = "Accueil <accueil@your-domain.fr>"
 SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 letters or digits, one letter at least; carriers filter "Info" or "Accueil"
-# ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily check's alerts; defaults to the first NOTIFY_EMAIL
+# ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily report and the flood alert; defaults to the first NOTIFY_EMAIL
 # SMS_COUNTRIES = "33"                # dialling codes that may receive an SMS (France only by default)
+# RETENTION_DAYS = "365"              # records older than this are deleted every morning (30 to 1825)
 
 # Call screening (docs/SETUP.md, step 5.4). Calls let through are counted per number, for withheld
 # numbers and in total; beyond the limits, the caller is turned away before Vapi answers.
@@ -40,7 +41,8 @@ VAPI_ASSISTANT_ID = ""                # the assistant id printed in step 4.3; ne
 # CALCOM_SLOTS_API_VERSION = "2024-09-04"
 # CALCOM_BOOKINGS_API_VERSION = "2026-02-25"
 
-# The daily check: configuration, the SMS key and credits, and every delivery that failed in the last
-# 24 hours. Problems are emailed to ALERT_EMAIL. 06:00 UTC is 7 or 8 a.m. in Paris.
+# The daily run: the check (configuration, the SMS key and credits, every delivery that failed in the
+# last 24 hours, refused calls), emailed to ALERT_EMAIL when something is wrong, then the deletion of
+# records older than RETENTION_DAYS. 06:00 UTC is 7 or 8 a.m. in Paris.
 [triggers]
 crons = ["0 6 * * *"]

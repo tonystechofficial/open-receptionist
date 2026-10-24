@@ -41,6 +41,15 @@ export function screenCall({ number, blocked = [], counts, limits = DEFAULT_LIMI
   return { allow: true };
 }
 
+// A wave from many numbers (the hourly total) or from withheld numbers cannot be stopped number by
+// number, so the operator hears about it at once; one number calling too often waits for the report.
+const FLOOD_REASONS = new Set(['total', 'anonymous']);
+
+/** True for the first refusal of a flood kind within the hour: the moment to alert, once per wave. */
+export function floodAlertDue(reason, sameReasonRefusalsLastHour) {
+  return FLOOD_REASONS.has(reason) && sameReasonRefusalsLastHour === 1;
+}
+
 const EMERGENCY = "En cas d'urgence, composez le 112.";
 
 /** What a turned-away caller hears. It always leaves a way out for an emergency. */

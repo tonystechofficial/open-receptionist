@@ -9,6 +9,7 @@
 //   recordAttempt(attempt)           -> attempt ({ number, at, decision, reason, via, providerCallId })
 //   attemptCounts({ number, now })   -> { numberHour, numberDay, anonymousHour, totalHour }, allowed only
 //   attemptsSince(iso)               -> attempts at or after that instant, oldest first
+//   purgeOlderThan(iso)              -> { calls, appointments, attempts } deleted, created before that instant
 //   all()                            -> { calls, appointments }
 // A call record holds { callId, caller, offered, status, urgent, summary, note, endedAt,
 // endedReason, recapSentAt, deliveries, createdAt, updatedAt }, `deliveries` being what was sent to
@@ -54,6 +55,16 @@ export function memoryStore() {
     async recordAttempt(a) { const row = attemptRow(a); attempts.push(row); return row; },
     async attemptCounts({ number, now }) { return countAttempts(attempts, number, now); },
     async attemptsSince(iso) { return since(attempts, iso); },
+    async purgeOlderThan(iso) {
+      const old = [...calls.values()].filter((c) => c.createdAt < iso);
+      for (const c of old) calls.delete(c.callId);
+      const keptAppointments = appointments.filter((a) => !(a.createdAt < iso));
+      const keptAttempts = attempts.filter((a) => !(a.at < iso));
+      const deleted = { calls: old.length, appointments: appointments.length - keptAppointments.length, attempts: attempts.length - keptAttempts.length };
+      appointments.splice(0, appointments.length, ...keptAppointments);
+      attempts.splice(0, attempts.length, ...keptAttempts);
+      return deleted;
+    },
     async getCall(callId) { return calls.get(callId) ?? null; },
     async upsertCall(callId, patch) {
       const next = merge(calls.get(callId), callId, patch);
@@ -85,6 +96,16 @@ export function jsonFileStore(path) {
     async recordAttempt(a) { const db = await load(); const row = attemptRow(a); db.attempts.push(row); await save(db); return row; },
     async attemptCounts({ number, now }) { return countAttempts((await load()).attempts, number, now); },
     async attemptsSince(iso) { return since((await load()).attempts, iso); },
+    async purgeOlderThan(iso) {
+      const db = await load();
+      const oldCalls = Object.values(db.calls).filter((c) => c.createdAt < iso);
+      for (const c of oldCalls) delete db.calls[c.callId];
+      const appointments = db.appointments.filter((a) => !(a.createdAt < iso));
+      const attempts = db.attempts.filter((a) => !(a.at < iso));
+      const deleted = { calls: oldCalls.length, appointments: db.appointments.length - appointments.length, attempts: db.attempts.length - attempts.length };
+      await save({ ...db, appointments, attempts });
+      return deleted;
+    },
     async getCall(callId) { return (await load()).calls[callId] ?? null; },
     async upsertCall(callId, patch) {
       const db = await load();

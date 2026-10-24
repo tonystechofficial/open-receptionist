@@ -6,6 +6,7 @@ import { fallbackResponse } from '../src/server/fallback.mjs';
 import { validateClientConfig } from '../src/core/config.mjs';
 import { deliveryProblems, callProblems, screeningProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
 import { blockedNumbers, screeningLimits } from '../src/core/screening.mjs';
+import { retentionDays, retentionCutoff } from '../src/core/retention.mjs';
 import { normalizePhone } from '../src/core/phone.mjs';
 import { screenIncoming } from '../src/server/screening.mjs';
 import { safeEqual } from '../src/server/secrets.mjs';
@@ -97,7 +98,16 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
     blocked: blockedNumbers(env.BLOCKED_NUMBERS),
     limits: screeningLimits(env),
   };
-  return { calendar, notify, store: makeStore(env), config, warnings, screening };
+  const alert = operatorMailer(env) ?? undefined; // the immediate flood alert
+  return { calendar, notify, store: makeStore(env), config, warnings, screening, alert };
+}
+
+/** Sends a message to the operator: ALERT_EMAIL, or else the first NOTIFY_EMAIL. Null without email. */
+function operatorMailer(env) {
+  const to = env.ALERT_EMAIL || splitList(env.NOTIFY_EMAIL)[0];
+  if (!env.RESEND_API_KEY || !to) return null;
+  const { sendEmail } = resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM });
+  return (mail) => sendEmail({ to, ...mail });
 }
 
 /**
@@ -142,6 +152,9 @@ export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new 
     problems.push(`Configuration refusée, chaque appel reçoit une promesse de rappel : ${error.message}`);
   }
 
+  const retention = retentionDays(env.RETENTION_DAYS);
+  if (retention.warning) problems.push(`Configuration : ${retention.warning}`);
+
   const sms = smsProvider(env);
   problems.push(...sms.warnings.map((w) => `Configuration : ${w}`));
   if (sms.adapter) {
@@ -167,18 +180,27 @@ export async function runCheck(env, makeStore = (e) => d1Store(e.DB), now = new 
   return { ok: problems.length === 0, problems };
 }
 
-/** Run the check and email the problems to ALERT_EMAIL, or else to the first NOTIFY_EMAIL. */
+/**
+ * The daily run: check, email the problems to the operator (ALERT_EMAIL, or else the first
+ * NOTIFY_EMAIL), then delete the records older than the retention period, whatever the check found.
+ */
 async function dailyCheck(env, makeStore) {
   const report = await runCheck(env, makeStore);
-  if (report.ok) return report;
-  console.error('[open-receptionist] daily check:', report.problems.join(' | '));
-  const to = env.ALERT_EMAIL || splitList(env.NOTIFY_EMAIL)[0];
-  if (!env.RESEND_API_KEY || !to) return report;
+  if (!report.ok) {
+    console.error('[open-receptionist] daily check:', report.problems.join(' | '));
+    const mailer = operatorMailer(env);
+    try {
+      if (mailer) await mailer(alertEmail({ company: env.CLIENT_COMPANY || 'open-receptionist', problems: report.problems }));
+    } catch (error) {
+      console.error('[open-receptionist] alert email failed', error);
+    }
+  }
   try {
-    const mail = alertEmail({ company: env.CLIENT_COMPANY || 'open-receptionist', problems: report.problems });
-    await resend({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM }).sendEmail({ to, ...mail });
+    const cutoff = retentionCutoff(new Date(), retentionDays(env.RETENTION_DAYS).days);
+    const deleted = await makeStore(env).purgeOlderThan(cutoff);
+    console.log('[open-receptionist] retention: deleted before', cutoff, JSON.stringify(deleted));
   } catch (error) {
-    console.error('[open-receptionist] alert email failed', error);
+    console.error('[open-receptionist] retention purge failed', error);
   }
   return report;
 }

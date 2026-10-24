@@ -123,7 +123,8 @@ has no fixed IP), low SMS credit (a Twilio balance under 5, or fewer than 20 Bre
 every SMS or recap that failed in the last 24 hours, as well as every ended call that never got a
 recap, every call cut at the time cap, any number that called 5 times or more, and the calls the
 screen refused, per number and reason. When it finds something, it emails `ALERT_EMAIL`, or the first
-`NOTIFY_EMAIL`, with one line per problem.
+`NOTIFY_EMAIL`, with one line per problem. Then, whatever it found, it deletes the records older than
+`RETENTION_DAYS` (12 months by default).
 
 ## 13. A long, silent or abusive call
 
@@ -155,6 +156,10 @@ signed requests only); method 2 runs when Vapi asks which assistant answers (`as
 Use one, not both. Each screened call becomes a row of `call_attempts`; only allowed calls count
 toward the limits, so a refused caller is let through again once the hour or the day has passed. If
 the screen breaks, the call is let through rather than lost.
+
+A wave cannot be stopped number by number, so the first call turned away for the hourly total or for
+withheld numbers emails the operator at once, once per hour per kind; a single number calling too
+often waits for the daily report. A failed alert never blocks the screening.
 
 ## Planned, not built
 

@@ -306,3 +306,41 @@ test('the daily check reports the calls the screen refused', async () => {
     assert.match(mails[0].text, /06 12 34 56 78/);
   });
 });
+
+// Daily deletion of old records, and the immediate flood alert through the Worker (2026-10-24).
+test('the daily run deletes records older than the retention period and keeps the rest', async () => {
+  await withFakeApis({}, async () => {
+    const store = memoryStore();
+    await store.upsertCall('old', { createdAt: '2024-01-01T00:00:00.000Z', status: 'a_rappeler' });
+    await store.upsertCall('new', { status: 'rdv' });
+    await runScheduled(createWorker({ makeStore: () => store }), { ...CHECK_ENV, RETENTION_DAYS: '365' });
+    assert.equal(await store.getCall('old'), null);
+    assert.ok(await store.getCall('new'));
+  });
+});
+
+test('a retention period out of bounds is reported, and 12 months apply meanwhile', async () => {
+  await withFakeApis({}, async (mails) => {
+    const store = memoryStore();
+    await store.upsertCall('old', { createdAt: '2024-01-01T00:00:00.000Z' });
+    await runScheduled(createWorker({ makeStore: () => store }), { ...CHECK_ENV, RETENTION_DAYS: '5' });
+    assert.equal(await store.getCall('old'), null);
+    assert.equal(mails.length, 1);
+    assert.match(mails[0].text, /RETENTION_DAYS/);
+  });
+});
+
+test('Twilio: the first call refused by the hourly total emails the operator right away', async () => {
+  await withFakeTwilio({}, async (seen) => {
+    const store = memoryStore();
+    const w = createWorker({ makeStore: () => store });
+    const env = { ...SCREEN_ENV, SCREEN_TOTAL_HOUR: '1' };
+    // Not 06 00 00 00 01: SCREEN_ENV blocks it, and a blocked call does not count toward the total.
+    await w.fetch(twilioCall('+33611111111', { env, callSid: 'CA_a' }), env);
+    const refused = await (await w.fetch(twilioCall('+33622222222', { env, callSid: 'CA_b' }), env)).text();
+    assert.match(refused, /<Say/);
+    assert.equal(seen.mails.length, 1);
+    assert.deepEqual(seen.mails[0].to, ['tony@example.fr']);
+    assert.match(seen.mails[0].subject, /vague/i);
+  });
+});

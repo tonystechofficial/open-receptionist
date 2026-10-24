@@ -59,7 +59,7 @@ A new client is a new config, not new code. See `config/client.example.json`:
 ## Quickstart
 
 ```bash
-npm test     # 187 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 204 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -129,6 +129,7 @@ About **$0.10 per minute of call**, all included. Prices checked in October 2026
 | Twilio French number | $1.35 a month |
 | Twilio SMS to France | $0.0798 each |
 | Cloudflare Workers and D1, Cal.com, Resend (up to 3,000 emails a month) | free |
+| Cloudflare Workers plan, recommended in production against junk-request floods | $5 a month for 10 million requests |
 
 Per business and per month, with 2-minute calls and a confirmation SMS for each booking:
 
@@ -171,6 +172,15 @@ for a cloned voice on your own key. Sources: [Vapi](https://vapi.ai/pricing),
 - **Method 2, any number:** Vapi asks the Worker which assistant answers (`assistant-request`); a
   refused caller hears the reason in a few billed seconds.
 - If the screen itself breaks, calls are let through rather than lost.
+- When a wave starts being turned away (the hourly total, or too many withheld numbers), the operator
+  gets an email at once, once per hour, without waiting for the daily report.
+
+**Junk requests to the endpoints** ([SETUP, step 3.6](docs/SETUP.md#36-shield-the-endpoints-against-junk-requests)):
+
+- They cannot get past the secret or the signature, and are refused before any data or provider is
+  touched. To keep a flood from eating the daily request allowance: serve the Worker from your own
+  domain, put the edge rule (`npm run cf:rate-limit`: more than 50 requests in 10 seconds from one
+  address are blocked), and take the $5 Workers plan in production.
 
 **SMS:**
 
@@ -203,8 +213,10 @@ for a cloned voice on your own key. Sources: [Vapi](https://vapi.ai/pricing),
   Keys with the least rights: a Resend key limited to sending, a Cloudflare token limited to the
   Worker and D1.
 
-**Not built yet:** a Cloudflare rate-limiting rule in front of the Worker's routes, and the automatic
-deletion of old rows (retention is applied by hand, see SETUP step 7).
+**Old records:** every morning the Worker deletes the calls, appointments and screened calls older
+than `RETENTION_DAYS`, 12 months by default (30 days to 5 years).
+
+What the product must do and must never do is the contract in [docs/SPEC.md](docs/SPEC.md).
 
 ## Data and privacy
 
@@ -221,8 +233,9 @@ Records live in **your** database; the voice platform is told to keep only metad
 ## Status
 
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
-  real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, and the
-  Worker's routing, authentication, fallback and daily check (187 tests).
+  real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, the flood
+  alert, the retention purge, the edge rule's plan, and the Worker's routing, authentication, fallback
+  and daily check (204 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

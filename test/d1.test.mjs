@@ -146,3 +146,22 @@ test('call attempts are counted per number, for withheld numbers and in total, a
   assert.deepEqual(since.map((a) => a.providerCallId), ['c5', 'c4', 'CA1', 'CA3']);
   assert.equal(since[3].reason, 'number-hour');
 });
+
+test('records older than the cut are deleted from every table, newer ones stay', { skip }, async () => {
+  const db = await d1Binding();
+  const store = d1Store(db);
+  const old = '2024-01-01T00:00:00.000Z';
+  await store.upsertCall('old', { status: 'a_rappeler' });
+  await db.prepare('UPDATE calls SET created_at = ? WHERE call_id = ?').bind(old, 'old').run();
+  await store.upsertCall('new', { status: 'rdv' });
+  await store.saveAppointment({ callId: 'old', at: old, label: 'x', caller: {}, createdAt: old });
+  await store.saveAppointment({ callId: 'new', at: '2026-10-30T08:00:00.000Z', label: 'y', caller: {}, createdAt: new Date().toISOString() });
+  await store.recordAttempt({ number: '+33612345678', at: old, decision: 'allowed', reason: null, via: 'twilio' });
+  await store.recordAttempt({ number: '+33612345678', at: new Date().toISOString(), decision: 'allowed', reason: null, via: 'twilio' });
+
+  assert.deepEqual(await store.purgeOlderThan('2025-01-01T00:00:00.000Z'), { calls: 1, appointments: 1, attempts: 1 });
+  assert.equal(await store.getCall('old'), null);
+  assert.ok(await store.getCall('new'));
+  assert.equal((await store.all()).appointments.length, 1);
+  assert.equal((await store.attemptsSince('2000-01-01T00:00:00.000Z')).length, 1);
+});

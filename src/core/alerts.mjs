@@ -86,6 +86,24 @@ export function creditProblem(provider, result = {}) {
   return null;
 }
 
+const WAVE = {
+  total: "le plafond d'appels par heure, tous appelants confondus, est atteint",
+  anonymous: "trop d'appels en numéro masqué arrivent dans l'heure",
+};
+
+/** The email sent at once, when a wave of calls starts being turned away. */
+export function floodAlertEmail({ company, reason, at }) {
+  const time = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).format(at);
+  const subject = `[open-receptionist] ${company} : vague d'appels, des appelants sont refusés`;
+  const lines = [
+    `Depuis ${time} (heure de Paris), ${WAVE[reason] ?? reason} : les appels suivants sont refusés avant que l'assistant ne réponde.`,
+    "Chaque appelant refusé entend le 112 pour une urgence. Les appels reprennent d'eux-mêmes quand le rythme redescend.",
+    "Si c'est une vraie affluence, rien à faire. Si des numéros abusent, ajoutez-les à BLOCKED_NUMBERS. Le détail sera dans le rapport quotidien.",
+    "Si vous n'avez pas installé ce standard, transférez ce message à la personne qui l'a fait.",
+  ];
+  return { subject, text: lines.join('\n'), html: `<p>${lines.map(escapeHtml).join('</p><p>')}</p>` };
+}
+
 /** The email the daily check sends when it finds something. It may reach the owner, hence the forward line. */
 export function alertEmail({ company, problems }) {
   const n = problems.length;

@@ -66,8 +66,10 @@ the store's SQL on SQLite, which D1 is built on.
 
 ## Retention
 
-RGPD requires a defined retention period. Decide one with each client, for example twelve months for
-call records, and delete older rows. A scheduled Worker can do it; it is not built yet.
+RGPD requires a defined retention period. Decide one with each client, 12 months by default, and set
+it in `RETENTION_DAYS` (30 days to 5 years). Every morning the Worker deletes the calls, appointments
+and screened calls older than that, and logs how many rows went. A value out of bounds is ignored,
+12 months apply, and the daily check reports it.
 
 ## The honest caveat
 

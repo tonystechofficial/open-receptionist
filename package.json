@@ -14,6 +14,7 @@
     "db:init:local": "npx wrangler d1 migrations apply open-receptionist --local",
     "cf:dev": "npx wrangler dev --local",
     "cf:tail": "npx wrangler tail",
+    "cf:rate-limit": "node scripts/cloudflare-rate-limit.mjs",
     "deploy": "npx wrangler deploy"
   }
 }

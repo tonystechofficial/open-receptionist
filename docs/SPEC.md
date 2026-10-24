@@ -59,9 +59,10 @@ business's calendar or a call-back request delivered to the owner.
   a request noted, hear free slots, and book one: no cancellation, no change to another booking, no
   access to anyone else's data, and nothing that moves money.
 - A flood of unauthenticated requests to the public endpoints does not stop real calls from being
-  answered. Recommended bound: one source sending junk requests nonstop, 10 a second for a whole day,
-  is cut off before the service does any work; a large attack from many sources is left to the
-  hosting provider's own protection.
+  answered. The bound: one source sending junk requests nonstop, 10 a second for a whole day, is cut
+  off at the network edge most of the time; whatever still gets through is refused before any data or
+  provider is touched, and the service's request allowance absorbs a full day of it. A large attack
+  from many sources is left to the hosting provider's own protection.
 - When call screening or a provider fails, the call is still answered rather than lost.
 
 **Data**
@@ -70,9 +71,9 @@ business's calendar or a call-back request delivered to the owner.
   controls. The voice platform keeps no recording and no transcript.
 - Recording is off by default. If a business turns it on, every caller is told at the start of the
   call, as the CNIL requires.
-- Records older than the business's retention period are deleted automatically, every day. Recommended
-  period: 12 months by default, adjustable per business; never shorter than the business needs to
-  call its customers back, never kept longer without a reason the business can state.
+- Records older than the business's retention period are deleted automatically, every day. The
+  period is 12 months by default, adjustable per business from 30 days (enough to call customers
+  back) to 5 years (the usual limit for claims between a business and its customers).
 
 **Operation**
 
@@ -82,8 +83,8 @@ business's calendar or a call-back request delivered to the owner.
   refused credentials, low messaging credit, failed messages, calls cut at the time cap, numbers
   calling 5 times or more, and calls turned away. No report is sent when nothing is wrong.
 - When callers start being turned away for the hourly total or the withheld-number limit, the
-  operator is alerted without waiting for the daily report. Recommended: within 5 minutes of the
-  first call turned away, and at most once an hour for the same wave.
+  operator is alerted without waiting for the daily report: within 5 minutes of the first call
+  turned away, and at most once an hour for the same wave.
 
 ## Non-goals
 
@@ -94,15 +95,15 @@ business's calendar or a call-back request delivered to the owner.
   European Union.
 - Replacing the business's calendar or customer database: the receptionist books into the calendar
   the business already uses.
-- Moving or cancelling an existing booking by voice (recommended out of scope): a voice cannot prove
-  who is calling, so a caller giving someone else's name could cancel that person's appointment. The
-  receptionist records a call-back request, and the business makes the change.
-- An owner dashboard of calls and appointments (recommended out of scope for now): the email recap
-  after each call and the daily report already show the owner and the operator what happened, and a
-  dashboard adds a login and personal data to protect.
-- Several businesses in one deployment (recommended out of scope for now): one deployment per business
-  keeps each business's callers, data and keys apart. Serving several from one deployment needs that
-  separation built and tested first.
+- Moving or cancelling an existing booking by voice: a voice cannot prove who is calling, so a caller
+  giving someone else's name could cancel that person's appointment. The receptionist records a
+  call-back request, and the business makes the change.
+- An owner dashboard of calls and appointments, for now: the email recap after each call and the
+  daily report already show the owner and the operator what happened, and a dashboard adds a login
+  and personal data to protect.
+- Several businesses in one deployment, for now: one deployment per business keeps each business's
+  callers, data and keys apart. Serving several from one deployment needs that separation built and
+  tested first.
 
 ## Done-when
 
@@ -131,12 +132,12 @@ business's calendar or a call-back request delivered to the owner.
 
 ## Context
 
-- Answers marked **recommended** are the maintainer's proposals on six open questions (request
-  flood, retention, flood alert, voice changes to bookings, dashboard, several businesses), written on
-  2026-10-24 for the decider to confirm or change.
+- The answers on the junk-request bound, the retention period, the flood alert, voice changes to
+  bookings, the dashboard and several businesses per deployment were proposed by the maintainer and
+  confirmed by the decider on 2026-10-24.
 - Product overview, costs and security model: [README](../README.md).
 - Every call flow in plain words: [FLOWS.md](FLOWS.md); where the data lives: [DATA.md](DATA.md);
   setting up a business: [SETUP.md](SETUP.md); the swappable providers: [PROVIDERS.md](PROVIDERS.md).
-- Most of this contract is delivered as of 2026-10-24. Not delivered yet: the automatic deletion of
-  old records, the immediate flood alert, and the protection against floods of unauthenticated
-  requests.
+- As of 2026-10-24 the whole contract is delivered in code. The edge protection against junk
+  requests is completed at deployment: it needs the service on its own domain and an edge rule,
+  described in SETUP.

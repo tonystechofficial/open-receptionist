@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deliveryProblems, alertEmail, creditProblem, callProblems, screeningProblems } from '../src/core/alerts.mjs';
+import { deliveryProblems, alertEmail, creditProblem, callProblems, screeningProblems, floodAlertEmail } from '../src/core/alerts.mjs';
 
 const AT = '2026-10-23T08:00:00.000Z';
 const caller = { nom: 'Jean Dupont', telephone: '+33612345678' };
@@ -118,4 +118,14 @@ test('a call that could not be routed for lack of VAPI_ASSISTANT_ID is a configu
   const problems = screeningProblems([{ number: '+33612345678', at: AT, decision: 'refused', reason: 'no-assistant', via: 'vapi' }]);
   assert.equal(problems.length, 1);
   assert.match(problems[0], /VAPI_ASSISTANT_ID/);
+});
+
+test('the flood alert names the business, the kind of wave and the time, and says callers still hear 112', () => {
+  const mail = floodAlertEmail({ company: 'Plomberie Dupont', reason: 'total', at: new Date('2026-10-24T12:05:00Z') });
+  assert.match(mail.subject, /Plomberie Dupont/);
+  assert.match(mail.subject, /vague/i);
+  assert.match(mail.text, /14:05/);
+  assert.match(mail.text, /112/);
+  assert.match(mail.text, /BLOCKED_NUMBERS/);
+  assert.match(floodAlertEmail({ company: 'D', reason: 'anonymous', at: new Date() }).text, /masqu/);
 });

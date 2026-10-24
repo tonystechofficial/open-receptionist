@@ -1,7 +1,7 @@
 // Screening an incoming call before the receptionist answers: who gets through, and what the others hear.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { screenCall, screeningLimits, blockedNumbers, refusalMessage, DEFAULT_LIMITS } from '../src/core/screening.mjs';
+import { screenCall, screeningLimits, blockedNumbers, refusalMessage, floodAlertDue, DEFAULT_LIMITS } from '../src/core/screening.mjs';
 
 const NONE = { numberHour: 0, numberDay: 0, anonymousHour: 0, totalHour: 0 };
 const ME = '+33612345678';
@@ -51,4 +51,12 @@ test('a refused caller is always told how to reach help in an emergency', () => 
   }
   assert.match(refusalMessage('number-hour', 'Plomberie Dupont'), /Plomberie Dupont/);
   assert.match(refusalMessage('anonymous', 'Plomberie Dupont'), /masqu/);
+});
+
+test('the operator is alerted on the first refusal of a flood kind in the hour, and only then', () => {
+  assert.equal(floodAlertDue('total', 1), true);
+  assert.equal(floodAlertDue('anonymous', 1), true);
+  assert.equal(floodAlertDue('total', 2), false);
+  assert.equal(floodAlertDue('number-hour', 1), false);
+  assert.equal(floodAlertDue('blocked', 1), false);
 });

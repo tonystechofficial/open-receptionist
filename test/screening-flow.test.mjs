@@ -64,3 +64,44 @@ test('without VAPI_ASSISTANT_ID the call cannot be routed: the caller is told, a
   const [attempt] = await d.store.attemptsSince('2026-10-24T00:00:00Z');
   assert.equal(attempt.reason, 'no-assistant');
 });
+
+// The immediate flood alert (2026-10-24): the first refusal of a wave in the hour alerts the operator.
+function alerting(limits) {
+  const d = deps({ limits: { ...DEFAULT_LIMITS, ...limits } });
+  d.sent = [];
+  d.alert = async (mail) => { d.sent.push(mail); };
+  return d;
+}
+
+test('the first call turned away by the hourly total alerts the operator once, not at every refusal', async () => {
+  const d = alerting({ totalHour: 2 });
+  await H.handleVapiMessage(request('+33600000001', 'a'), d);
+  await H.handleVapiMessage(request('+33600000002', 'b'), d);
+  assert.equal(d.sent.length, 0);
+  assert.ok((await H.handleVapiMessage(request('+33600000003', 'c'), d)).error);
+  await H.handleVapiMessage(request('+33600000004', 'd'), d);
+  assert.equal(d.sent.length, 1);
+  assert.match(d.sent[0].subject, /vague/i);
+});
+
+test('a wave of withheld numbers alerts the operator too', async () => {
+  const d = alerting({ anonymousHour: 1 });
+  await H.handleVapiMessage(request(null, 'a'), d);
+  await H.handleVapiMessage(request(null, 'b'), d);
+  assert.equal(d.sent.length, 1);
+  assert.match(d.sent[0].text, /masqu/);
+});
+
+test('one number calling too often does not alert in real time: the daily report covers it', async () => {
+  const d = alerting({ perNumberHour: 1 });
+  await H.handleVapiMessage(request('+33612345678', 'a'), d);
+  await H.handleVapiMessage(request('+33612345678', 'b'), d);
+  assert.equal(d.sent.length, 0);
+});
+
+test('an alert that cannot be sent never blocks the call screening', async () => {
+  const d = alerting({ totalHour: 1 });
+  d.alert = async () => { throw new Error('resend 500'); };
+  await H.handleVapiMessage(request('+33600000001', 'a'), d);
+  assert.match((await H.handleVapiMessage(request('+33600000002', 'b'), d)).error, /112/);
+});

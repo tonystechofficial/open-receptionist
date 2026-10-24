@@ -13,7 +13,7 @@ Plan about three hours of work, plus one to three days for the French number's r
 
 | Item | Cost |
 |---|---|
-| Cloudflare Workers and D1 | free tier |
+| Cloudflare Workers and D1 | free tier; the $5 a month plan (10 million requests) is recommended in production, see step 3.6 |
 | Cal.com | free plan, or self-hosted |
 | Resend, for the email recap | free tier |
 | A French phone number from Twilio | about $1.35 a month |
@@ -134,7 +134,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 187 tests, nothing to install
+npm test        # 204 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -185,7 +185,8 @@ Edit the `[vars]` block of `wrangler.toml`:
 | `CALCOM_EVENT_TYPE_ID` | the event type id from step 1.2 |
 | `MAIL_FROM` | a sender on the verified Resend domain, such as `Accueil <accueil@yourdomain.fr>` |
 | `SMS_SENDER` | the business's short name from step 1.6: 3 to 11 letters or digits with at least one letter, never a generic name such as `Info` or `Accueil`. Required when SMS is on |
-| `ALERT_EMAIL` | who receives the daily check's alerts, usually you. Defaults to the first `NOTIFY_EMAIL` |
+| `ALERT_EMAIL` | who receives the daily check's alerts and the immediate flood alert, usually you. Defaults to the first `NOTIFY_EMAIL` |
+| `RETENTION_DAYS` | optional: how long call records are kept before the daily run deletes them. 365 by default, from 30 to 1825 |
 
 To keep the Worker's logs after each call, also add:
 
@@ -222,7 +223,30 @@ This is the check the `[triggers]` cron in `wrangler.toml` runs every morning, r
 emailing anything. Each problem comes back as a sentence: a configuration the Worker refuses, a missing
 provider key, SMS credentials the provider refuses, SMS credit running low, or a confirmation SMS or recap that
 failed in the last 24 hours. The morning run emails the same list to `ALERT_EMAIL`, only when there
-is one. Each call also keeps, in its `deliveries` column, what was sent to whom and what failed.
+is one, then deletes the records older than `RETENTION_DAYS`. Each call also keeps, in its
+`deliveries` column, what was sent to whom and what failed.
+
+### 3.6 Shield the endpoints against junk requests
+
+A source hammering the Worker's public addresses cannot get past the secret or the signature, but
+each request still counts against the daily allowance, and on the free plan 100,000 requests a day is
+all there is: past it, real calls fail too. Two settings make that flood harmless:
+
+1. **Serve the Worker from your own domain** (step 3.4): an edge rule needs a zone on your account;
+   it cannot be put on `workers.dev`. Point Vapi and Twilio at the new address.
+2. **Put the edge rule**, which blocks any address sending more than 50 requests in 10 seconds to the
+   receptionist's endpoints, for 10 seconds: the most Cloudflare's free plan allows, and plenty for
+   real traffic. With a token that has **Zone WAF: Edit** on that zone:
+   ```bash
+   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ZONE_ID=... npm run cf:rate-limit            # shows the rule
+   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ZONE_ID=... npm run cf:rate-limit -- --apply # puts it
+   ```
+   Or in the dashboard: **Security > WAF > Rate limiting rules**, the same paths
+   (`/api/vapi`, `/api/tools`, `/api/call-report`, `/api/twilio/voice`, `/api/check`), counted per IP,
+   50 requests per 10 seconds, block for 10 seconds.
+3. **Take the Workers plan at $5 a month** in production. A determined source still gets about a third
+   of its requests through between blocks; 10 million requests a month absorb a full day of it, where
+   the free plan's 100,000 a day would run out.
 
 ## 4. The Vapi assistant
 
@@ -353,16 +377,9 @@ effect of Zero Data Retention, not a fault.
 - **Contract.** Sign a data processing agreement with the client: you process their customers'
   data. List your sub-processors: Vapi and the speech, model and voice providers it uses, the
   telephony provider, Cloudflare, Cal.com, Resend, and the SMS provider, Twilio or Brevo.
-- **Retention.** Agree on a period, for example twelve months, and delete older rows. There is no
-  automatic purge yet:
-  ```bash
-  npx wrangler d1 execute open-receptionist --remote \
-    --command "DELETE FROM appointments WHERE created_at < date('now','-12 months')"
-  npx wrangler d1 execute open-receptionist --remote \
-    --command "DELETE FROM calls WHERE created_at < date('now','-12 months')"
-  npx wrangler d1 execute open-receptionist --remote \
-    --command "DELETE FROM call_attempts WHERE at < date('now','-12 months')"
-  ```
+- **Retention.** Agree on a period with the client, 12 months by default, and set it in
+  `RETENTION_DAYS` (30 to 1825). Every morning the Worker deletes the calls, appointments and
+  screened calls older than that; the Worker's log shows how many rows went.
 - **Data location.** The database is in the EU, but the voice platform's real-time processing is not
   guaranteed to stay in the EU. Do not promise "data hosted in Europe" in writing.
 - **Emergency wording.** Keep the client's written validation of the `urgences` text.
@@ -391,7 +408,8 @@ effect of Zero Data Retention, not a fault.
 - No dashboard yet. Read calls from the recaps or with the database query in step 6.
 - The receptionist cannot move or cancel an existing booking. It takes a message for a call-back.
 - Google Calendar is reached through Cal.com, not directly.
-- Data retention is applied by hand.
+- On the Node/Vercel entry, nothing runs every morning: the daily check, the retention purge and the
+  call screening's Twilio method are Worker-only.
 
 Every call flow is described in [FLOWS.md](FLOWS.md), where the data lives in [DATA.md](DATA.md),
 and the swappable pieces in [PROVIDERS.md](PROVIDERS.md).

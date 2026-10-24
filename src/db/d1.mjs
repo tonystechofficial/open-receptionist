@@ -52,6 +52,16 @@ export function d1Store(db) {
       }));
     },
 
+    /** The retention purge: everything created before the cut, in every table. */
+    async purgeOlderThan(iso) {
+      const changes = async (sql) => Number((await db.prepare(sql).bind(iso).run())?.meta?.changes ?? 0);
+      return {
+        appointments: await changes('DELETE FROM appointments WHERE created_at < ?'),
+        calls: await changes('DELETE FROM calls WHERE created_at < ?'),
+        attempts: await changes('DELETE FROM call_attempts WHERE at < ?'),
+      };
+    },
+
     async upsertCall(callId, patch) {
       const now = new Date().toISOString();
       const previous = await getCall(callId);
