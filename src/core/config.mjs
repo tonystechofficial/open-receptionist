@@ -17,6 +17,28 @@ const DEFAULTS = {
 const GENERIC_SENDERS = new Set(['SMS', 'INFO', 'INFOS', 'VERIFY', 'HELP', 'SUPPORT', 'ASSISTANCE', 'AIDE', 'ACCUEIL']);
 
 /**
+ * The client configuration from the Worker's settings: the [vars] of wrangler.toml, or the environment
+ * of the Node entry. Empty settings are left unset, so validateClientConfig applies its defaults.
+ */
+export function configFromVars(vars) {
+  const list = (s) => (s || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return {
+    company: vars.CLIENT_COMPANY,
+    metier: vars.CLIENT_METIER,
+    horaires: vars.CLIENT_HORAIRES,
+    telephone: vars.CLIENT_TELEPHONE || undefined,
+    timeZone: vars.TIME_ZONE || undefined,
+    smsSender: vars.SMS_SENDER || undefined,
+    smsCountries: list(vars.SMS_COUNTRIES),
+    // The Worker enforces the service area; the rest of the business information lives in the assistant.
+    infos: { zone: list(vars.CLIENT_ZONE), tarifsUrl: vars.CLIENT_TARIFS_URL || undefined },
+    confirmation: { sms: vars.CONFIRM_CALLER_SMS !== 'false' },
+    calendar: { provider: 'calcom', id: vars.CALCOM_EVENT_TYPE_ID },
+    notify: { email: list(vars.NOTIFY_EMAIL), sms: list(vars.NOTIFY_SMS) },
+  };
+}
+
+/**
  * @param {object} cfg
  * @param {{providers?: {email:boolean, sms:boolean}}} [options] which provider keys are set, when
  *   the caller knows; the rules that depend on them are skipped otherwise.

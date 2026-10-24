@@ -3,7 +3,7 @@
 // Multi-tenant: route by the Vapi assistant id or the called number to the right client config,
 // then build deps per client.
 import { readFile } from 'node:fs/promises';
-import { validateClientConfig } from '../core/config.mjs';
+import { validateClientConfig, configFromVars } from '../core/config.mjs';
 import { blockedNumbers, screeningLimits } from '../core/screening.mjs';
 import { calcom } from '../providers/calendar/calcom.mjs';
 import { google } from '../providers/calendar/google.mjs';
@@ -19,7 +19,7 @@ export async function buildDeps() {
 
   const sms = smsProvider(env);
   const providers = { email: Boolean(env.RESEND_API_KEY), sms: sms.adapter !== null };
-  const { ok, errors, warnings, config } = validateClientConfig((await readClientConfig()) ?? envConfig(env), { providers });
+  const { ok, errors, warnings, config } = validateClientConfig((await readClientConfig()) ?? configFromVars(env), { providers });
   if (!ok) throw new Error(`invalid client config: ${errors.join('; ')}`);
   for (const warning of [...sms.warnings, ...warnings]) console.warn('[open-receptionist]', warning);
 
@@ -51,21 +51,4 @@ async function readClientConfig() {
   } catch {
     return null;
   }
-}
-
-function envConfig(env) {
-  const list = (s) => (s || '').split(',').map((x) => x.trim()).filter(Boolean);
-  return {
-    company: env.CLIENT_COMPANY,
-    metier: env.CLIENT_METIER,
-    horaires: env.CLIENT_HORAIRES,
-    telephone: env.CLIENT_TELEPHONE || undefined,
-    timeZone: env.TIME_ZONE || undefined,
-    smsSender: env.SMS_SENDER || undefined,
-    smsCountries: list(env.SMS_COUNTRIES),
-    infos: { zone: list(env.CLIENT_ZONE), tarifsUrl: env.CLIENT_TARIFS_URL || undefined },
-    confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
-    calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
-    notify: { email: list(env.NOTIFY_EMAIL), sms: list(env.NOTIFY_SMS) },
-  };
 }

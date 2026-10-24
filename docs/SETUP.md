@@ -139,7 +139,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 232 tests, nothing to install
+npm test        # 246 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -184,8 +184,15 @@ Each `secret put` asks for the value, stores it encrypted, and never shows it ag
 
 ### 3.3 Fill in the client's settings
 
-Edit the `[vars]` block of `wrangler.toml`, replacing every example value. The example email and phone
-numbers above all: left in place, the recaps, with the callers' details, would go to whoever owns them.
+```bash
+npm run configure
+```
+
+It asks for each setting below, one at a time, with what it is for and an example, and checks every
+answer with the rules the Worker applies when it starts. It refuses the template's example email,
+phone numbers and ids: left in place, the recaps, with the callers' details, would go to whoever owns
+them. At the end it writes the `[vars]` block of `wrangler.toml`, comments kept. Run it again whenever
+a setting changes, then deploy. Editing the `[vars]` block by hand works too:
 
 | Variable | What to put |
 |---|---|

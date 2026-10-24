@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateClientConfig } from '../src/core/config.mjs';
+import { validateClientConfig, configFromVars } from '../src/core/config.mjs';
+
+test('the Worker settings become the client configuration, empty ones left unset', () => {
+  const config = configFromVars({
+    CLIENT_COMPANY: 'Plomberie Martin', CLIENT_METIER: 'plomberie', CLIENT_HORAIRES: 'du lundi au vendredi',
+    CLIENT_TELEPHONE: '05 56 00 00 01', TIME_ZONE: 'Europe/Paris', SMS_SENDER: 'Martin', SMS_COUNTRIES: '33, 32',
+    CLIENT_ZONE: 'Bordeaux, Mérignac', CLIENT_TARIFS_URL: '', CONFIRM_CALLER_SMS: 'false', CALCOM_EVENT_TYPE_ID: '987654',
+    NOTIFY_EMAIL: 'patron@martin.fr, compta@martin.fr', NOTIFY_SMS: '',
+  });
+  assert.deepEqual(config, {
+    company: 'Plomberie Martin', metier: 'plomberie', horaires: 'du lundi au vendredi', telephone: '05 56 00 00 01',
+    timeZone: 'Europe/Paris', smsSender: 'Martin', smsCountries: ['33', '32'],
+    infos: { zone: ['Bordeaux', 'Mérignac'], tarifsUrl: undefined },
+    confirmation: { sms: false }, calendar: { provider: 'calcom', id: '987654' },
+    notify: { email: ['patron@martin.fr', 'compta@martin.fr'], sms: [] },
+  });
+});
 
 const base = {
   company: 'Plomberie Dupont',

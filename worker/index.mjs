@@ -3,7 +3,7 @@
 // with the Node/Vercel entry in api/; only the server entry and the store differ.
 import { handleVapiMessage } from '../src/server/handlers.mjs';
 import { fallbackResponse } from '../src/server/fallback.mjs';
-import { validateClientConfig } from '../src/core/config.mjs';
+import { validateClientConfig, configFromVars } from '../src/core/config.mjs';
 import { deliveryProblems, callProblems, screeningProblems, alertEmail, creditProblem } from '../src/core/alerts.mjs';
 import { blockedNumbers, screeningLimits } from '../src/core/screening.mjs';
 import { retentionDays, retentionCutoff } from '../src/core/retention.mjs';
@@ -69,20 +69,7 @@ export default createWorker();
 export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
   const sms = smsProvider(env);
   const providers = { email: Boolean(env.RESEND_API_KEY), sms: sms.adapter !== null };
-  const { ok, errors, warnings, config } = validateClientConfig({
-    company: env.CLIENT_COMPANY,
-    metier: env.CLIENT_METIER,
-    horaires: env.CLIENT_HORAIRES,
-    telephone: env.CLIENT_TELEPHONE || undefined,
-    timeZone: env.TIME_ZONE || undefined,
-    smsSender: env.SMS_SENDER || undefined,
-    smsCountries: splitList(env.SMS_COUNTRIES),
-    // The service area is enforced here; the rest of the business information lives in the assistant.
-    infos: { zone: splitList(env.CLIENT_ZONE), tarifsUrl: env.CLIENT_TARIFS_URL || undefined },
-    confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
-    calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
-    notify: { email: splitList(env.NOTIFY_EMAIL), sms: splitList(env.NOTIFY_SMS) },
-  }, { providers });
+  const { ok, errors, warnings, config } = validateClientConfig(configFromVars(env), { providers });
   if (!ok) throw new Error(`invalid client config: ${errors.join('; ')}`);
 
   const calendar = calcom({
