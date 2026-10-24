@@ -35,8 +35,8 @@ async function ask(prompt) {
 }
 
 console.log(`The business's settings, ${QUESTIONS.length} questions. Each answer is checked with the rules the Worker
-applies; nothing is written before the last one. Enter keeps the value in [brackets], - leaves an optional
-one empty, Ctrl+C stops without writing.
+applies; nothing is written before the last one. Where a "Now:" line shows the value already in
+wrangler.toml, Enter keeps it. Ctrl+C stops without writing.
 `);
 
 const answers = { ...current };
@@ -47,8 +47,9 @@ for (const [i, q] of QUESTIONS.entries()) {
   console.log(`${i + 1}/${QUESTIONS.length}  ${q.title}${q.required || q.yesNo ? '' : ' (optional)'}`);
   console.log(`      ${q.help}`);
   console.log(`      Example: ${q.example}`);
+  if (shown) console.log(`      Now: ${shown}   (Enter keeps it${q.required || q.yesNo ? '' : ', - empties it'})`);
   for (;;) {
-    const raw = await ask(`      ${q.key}${shown ? ` [${shown}]` : ''}: `);
+    const raw = await ask(`      ${q.key}: `);
     const value = raw === '' ? kept : raw === '-' ? '' : normalizeAnswer(q, raw);
     const error = checkAnswer(q.key, value, { ...answers, [q.key]: value }, { examples });
     if (!error) {
@@ -62,7 +63,7 @@ for (const [i, q] of QUESTIONS.entries()) {
 
 console.log('To write into wrangler.toml:');
 for (const q of QUESTIONS) console.log(`  ${q.key} = "${answers[q.key] ?? ''}"`);
-if (normalizeAnswer({ yesNo: true }, (await ask('\nWrite them? [yes]: ')) || 'yes') !== 'true') {
+if (normalizeAnswer({ yesNo: true }, (await ask('\nWrite them? (Enter = yes): ')) || 'yes') !== 'true') {
   console.log('Nothing written.');
   process.exit(0);
 }
