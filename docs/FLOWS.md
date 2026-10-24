@@ -180,8 +180,10 @@ How it enters the call:
    states the call-out fee and whether the quote is free, so the caller books knowing the price.
 4. **Never a quote.** Asked the price of a specific job, the agent gives the flat price if `infos`
    lists one, otherwise says the exact price comes in a quote before the work. No diagnosis.
-5. **In writing.** With `tarifsUrl` set, the confirmation SMS ends with the link to the rates page.
-   The SMS may then take two segments.
+5. **The rates page.** With `tarifsUrl` set, the confirmation SMS ends with the link to the rates
+   page, so the caller can read the prices before the visit. The SMS may then take two segments. The
+   link does not replace what the business owes in writing: a web page is not a durable medium
+   (CJEU, C-49/11), and the detailed quote, on paper or by email, comes before any work.
 
 The town and the address go to the calendar booking's notes, to the owner's recap, and to the call
 record. The Worker enforces the area from `CLIENT_ZONE`; the agent learns it from `infos.zone` in

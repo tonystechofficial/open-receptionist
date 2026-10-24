@@ -27,8 +27,9 @@ export function formatPhoneFr(phone) {
 
 /**
  * The SMS the caller receives once the appointment is booked. `label` is an absolute, written date.
- * With a published rates page, its link puts the price information in writing (home repair in France
- * must give it before the work); the SMS may then take two segments.
+ * With a published rates page, its link lets the caller read the prices before the visit; the SMS may
+ * then take two segments. A link is not a durable medium: the written quote that home repair in France
+ * owes before the work stays with the business.
  */
 export function confirmationSms({ company, label, contactPhone, tarifsUrl }) {
   const parts = [`${company} : votre rendez-vous est confirmé pour le ${label}.`];

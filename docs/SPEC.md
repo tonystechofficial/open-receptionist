@@ -45,7 +45,8 @@ business's calendar or a call-back request delivered to the owner.
   reported again, and it is reported to the operator.
 - The caller receives one confirmation SMS per booking, only on a mobile number in an allowed country
   (France by default), never on a landline. When the business publishes its rates online, the SMS
-  carries the link, so the prices also reach the caller in writing.
+  carries the link, so the caller can read them before the visit; the written quote the business owes
+  before any work stays its own.
 
 **Cost bounds**
 
