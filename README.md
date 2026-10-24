@@ -84,10 +84,10 @@ the business's name and only texts verified numbers.
 ```bash
 npx wrangler login
 npx wrangler d1 create open-receptionist --jurisdiction eu # EU only, set at creation
-npm run db:id                                              # writes the new database's id into wrangler.toml
+npm run db:id                                              # creates wrangler.toml with the new database's id
 npm run db:init                                            # applies every file in migrations/
 # expect "0001_init.sql ✅": the database now has the calls, appointments and call_attempts tables
-# wrangler.toml now holds this deployment's values: never commit it to a public repository
+# wrangler.toml is a copy of wrangler.example.toml that git ignores: your deployment's values stay local
 npm run secret:webhook                                     # random WEBHOOK_SECRET, set and shown once: keep it for Vapi
 npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
@@ -106,7 +106,7 @@ The deploy also schedules the **daily check** (`[triggers]` in `wrangler.toml`, 
 24 hours has a problem.
 
 To **update** a running deployment: `git pull`, `npm test`, `npm run db:init` (applies any new
-migration), then `npm run deploy`.
+migration), copy into `wrangler.toml` any new setting of `wrangler.example.toml`, then `npm run deploy`.
 
 Then on Vapi:
 

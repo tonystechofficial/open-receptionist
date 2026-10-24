@@ -1,3 +1,5 @@
+# The template of wrangler.toml. `npm run db:id` copies it to wrangler.toml, which git ignores: the copy
+# holds this deployment's values (database id, client settings), so edit the copy, not this file.
 name = "open-receptionist"
 main = "worker/index.mjs"
 compatibility_date = "2026-09-01"

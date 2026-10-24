@@ -157,12 +157,14 @@ npm run db:init
 set when the database is created. A location hint such as `--location weur` is not enough: Cloudflare
 does not guarantee it ([data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
 
-`npm run db:id` finds the database by its name with `wrangler d1 list` and writes its id into
-`wrangler.toml`, in place of `REPLACE_WITH_D1_DATABASE_ID`; it warns when the database is not in the EU
-jurisdiction. Without it, `db:init` fails on a request to `.../d1/database/REPLACE_WITH_D1_DATABASE_ID/query`.
-`db:init` then answers `0001_init.sql ✅`, and the database holds the `calls`, `appointments` and
-`call_attempts` tables. From here on, `wrangler.toml` holds this deployment's values (the database
-id, then the `[vars]` of step 3.3): never commit it to a public repository.
+`npm run db:id` creates `wrangler.toml` from `wrangler.example.toml` the first time, finds the database
+by its name with `wrangler d1 list`, and writes its id in place of `REPLACE_WITH_D1_DATABASE_ID`; it
+warns when the database is not in the EU jurisdiction. `db:init` then answers `0001_init.sql ✅`, and
+the database holds the `calls`, `appointments` and `call_attempts` tables.
+
+`wrangler.toml` holds this deployment's values (the database id, then the `[vars]` of step 3.3), and git
+ignores it, so they stay out of the repository. `wrangler.example.toml` is the template: after a
+`git pull`, copy any new setting from it into `wrangler.toml`.
 
 ### 3.2 Set the secrets
 
@@ -299,7 +301,7 @@ Fill it with the **same** company, trade, hours, phone and recipients as the `[v
   reads them word for word and invents nothing else; see [FLOWS.md](FLOWS.md#15-questions-about-the-business-prices-and-the-service-area);
 - `notify`, `smsSender` and `confirmation`, matching the Worker's settings. `notify.email` is required.
 
-`config/client.json` is ignored by git. The Worker reads `wrangler.toml` and the assistant script
+`config/client.json` is ignored by git, like `wrangler.toml`. The Worker reads `wrangler.toml` and the assistant script
 reads `config/client.json`, so change both whenever a setting changes.
 
 ### 4.3 Create the assistant
@@ -416,7 +418,7 @@ effect of Zero Data Retention, not a fault.
 | Task | How |
 |---|---|
 | Watch calls live | `npm run cf:tail`, or Workers Logs in the dashboard |
-| Ship an update | `git pull`, `npm test`, `npm run db:init` to apply any new migration, then `npm run deploy` |
+| Ship an update | `git pull`, `npm test`, `npm run db:init` to apply any new migration, copy any new setting of `wrangler.example.toml` into `wrangler.toml`, then `npm run deploy` |
 | Undo a bad deploy | `npx wrangler rollback` |
 | Change a setting | edit `[vars]` and `config/client.json`, run `npm run deploy`, then re-run the assistant script with `VAPI_ASSISTANT_ID` |
 | Rotate the webhook secret | `npm run secret:webhook` and update the Vapi credential **at the same time**: calls fail in between |

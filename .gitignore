@@ -9,3 +9,4 @@ config/client.json
 .wrangler/
 .dev.vars
 .DS_Store
+wrangler.toml
