@@ -55,13 +55,18 @@ nothing we need. Only the summary in the owner recap would go.
 
 ## Hosting the database on Cloudflare D1 (free tier)
 
-Create the database with an EU location so the records sit in Europe:
+Create the database in the EU jurisdiction, so the records are stored and processed in the European
+Union only:
 
 ```bash
-npx wrangler d1 create open-receptionist --location weur
+npx wrangler d1 create open-receptionist --jurisdiction eu
 ```
 
-`weur` is Western Europe. Because `src/db/d1.mjs` implements the same interface as the in-memory
+The jurisdiction can only be set when the database is created. A location hint such as
+`--location weur` is not enough: Cloudflare says a hint "does not guarantee that D1 runs in your
+preferred location" ([data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
+To check a database, `npx wrangler d1 info open-receptionist` must show `jurisdiction` `eu`.
+Because `src/db/d1.mjs` implements the same interface as the in-memory
 store, nothing else in the codebase knows the database is D1. The tests run the real migration and
 the store's SQL on SQLite, which D1 is built on.
 

@@ -148,8 +148,12 @@ npm test        # 224 tests, nothing to install
 
 ```bash
 npx wrangler login
-npx wrangler d1 create open-receptionist --location weur
+npx wrangler d1 create open-receptionist --jurisdiction eu
 ```
+
+`--jurisdiction eu` keeps the records stored and processed in the European Union, and it can only be
+set when the database is created. A location hint such as `--location weur` is not enough: Cloudflare
+does not guarantee it ([data location](https://developers.cloudflare.com/d1/configuration/data-location/)).
 
 Copy the `database_id` printed by the second command into `wrangler.toml`, in place of
 `REPLACE_WITH_D1_DATABASE_ID` (`npx wrangler d1 list` shows it again). Left as is, the next command

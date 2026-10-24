@@ -83,7 +83,7 @@ the business's name and only texts verified numbers.
 
 ```bash
 npx wrangler login
-npx wrangler d1 create open-receptionist --location weur   # prints the new database's database_id
+npx wrangler d1 create open-receptionist --jurisdiction eu # EU only, set at creation; prints its database_id
 # in wrangler.toml, put that database_id in place of REPLACE_WITH_D1_DATABASE_ID
 # (`npx wrangler d1 list` shows it again; left as is, db:init fails on .../REPLACE_WITH_D1_DATABASE_ID/query)
 npm run db:init                                            # applies every file in migrations/
