@@ -93,8 +93,8 @@ npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio; or BREVO_API_KEY for Brevo
 npx wrangler secret put TWILIO_AUTH_TOKEN
-# edit the [vars] block in wrangler.toml: company, métier, phone, recipients (an email is required),
-# Cal.com event type, SMS_SENDER (the business's short name) and ALERT_EMAIL (you)
+# open wrangler.toml and replace the example values under [vars] with the business's own, each line
+# explained in docs/SETUP.md step 3.3: the example email and phone numbers above all, or the recaps go to them
 npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev
 curl https://open-receptionist.<you>.workers.dev/health    # {"ok":true}
 curl -H "x-vapi-secret: <WEBHOOK_SECRET>" https://open-receptionist.<you>.workers.dev/api/check

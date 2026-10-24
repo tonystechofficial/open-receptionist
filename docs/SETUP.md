@@ -184,7 +184,8 @@ Each `secret put` asks for the value, stores it encrypted, and never shows it ag
 
 ### 3.3 Fill in the client's settings
 
-Edit the `[vars]` block of `wrangler.toml`:
+Edit the `[vars]` block of `wrangler.toml`, replacing every example value. The example email and phone
+numbers above all: left in place, the recaps, with the callers' details, would go to whoever owns them.
 
 | Variable | What to put |
 |---|---|
