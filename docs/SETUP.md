@@ -166,11 +166,11 @@ id, then the `[vars]` of step 3.3): never commit it to a public repository.
 
 ### 3.2 Set the secrets
 
-Generate a long random webhook secret and keep it: Vapi needs the same value in step 4.
+`npm run secret:webhook` makes a random webhook secret (32 bytes), sets it on the Worker, and shows it
+once: keep it, Vapi needs the same value in step 4. Then set the providers' keys:
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-npx wrangler secret put WEBHOOK_SECRET
+npm run secret:webhook
 npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID
@@ -419,7 +419,7 @@ effect of Zero Data Retention, not a fault.
 | Ship an update | `git pull`, `npm test`, `npm run db:init` to apply any new migration, then `npm run deploy` |
 | Undo a bad deploy | `npx wrangler rollback` |
 | Change a setting | edit `[vars]` and `config/client.json`, run `npm run deploy`, then re-run the assistant script with `VAPI_ASSISTANT_ID` |
-| Rotate the webhook secret | `npx wrangler secret put WEBHOOK_SECRET` and update the Vapi credential **at the same time**: calls fail in between |
+| Rotate the webhook secret | `npm run secret:webhook` and update the Vapi credential **at the same time**: calls fail in between |
 | Rotate another key | `npx wrangler secret put <NAME>`; it takes effect without a separate deploy |
 | Back up the database | `npx wrangler d1 export open-receptionist --remote --output backup.sql`; D1's point-in-time restore also covers recent days, depending on your plan |
 | Find failed messages | the daily check emails them; to look yourself: `npx wrangler d1 execute open-receptionist --remote --command "SELECT call_id, deliveries FROM calls WHERE deliveries LIKE '%failed%' ORDER BY updated_at DESC LIMIT 20"` |

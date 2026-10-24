@@ -13,6 +13,7 @@
     "db:id": "node scripts/set-database-id.mjs",
     "db:init": "npx wrangler d1 migrations apply open-receptionist --remote",
     "db:init:local": "npx wrangler d1 migrations apply open-receptionist --local",
+    "secret:webhook": "node scripts/set-webhook-secret.mjs",
     "cf:dev": "npx wrangler dev --local",
     "cf:tail": "npx wrangler tail",
     "cf:rate-limit": "node scripts/cloudflare-rate-limit.mjs",

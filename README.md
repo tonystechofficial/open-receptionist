@@ -88,8 +88,7 @@ npm run db:id                                              # writes the new data
 npm run db:init                                            # applies every file in migrations/
 # expect "0001_init.sql ✅": the database now has the calls, appointments and call_attempts tables
 # wrangler.toml now holds this deployment's values: never commit it to a public repository
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # your WEBHOOK_SECRET: keep it
-npx wrangler secret put WEBHOOK_SECRET                     # paste it; Vapi gets the same value below
+npm run secret:webhook                                     # random WEBHOOK_SECRET, set and shown once: keep it for Vapi
 npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio; or BREVO_API_KEY for Brevo
