@@ -60,3 +60,15 @@ test('ownerRecap states the booked slot for a normal call', () => {
   assert.match(r.text, /Résumé : Demande de devis\./);
   assert.match(r.sms, /RDV vendredi 23 octobre à 9 h 30/);
 });
+
+test('with a published rates page, the confirmation carries its link, still in the SMS alphabet', () => {
+  const s = confirmationSms({ company: 'Plomberie Dupont', label: 'vendredi 23 octobre à 9 h 30', contactPhone: '+33556123456', tarifsUrl: 'https://plomberie-dupont.fr/tarifs' });
+  assert.ok(s.includes('Tarifs : https://plomberie-dupont.fr/tarifs'), s);
+  assert.match(s, GSM7);
+});
+
+test('the owner recap gives the address and the town of the job', () => {
+  const r = ownerRecap({ company: 'D', caller: { nom: 'Jean', besoin: 'fuite', urgence: 'normale', telephone: '+33612345678', ville: 'Mérignac', adresse: '12 rue des Lilas' } });
+  assert.match(r.text, /Adresse : 12 rue des Lilas, Mérignac/);
+  assert.match(r.sms, /Mérignac/);
+});

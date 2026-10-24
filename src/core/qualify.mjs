@@ -26,14 +26,17 @@ function normEmail(e) {
 }
 
 /**
- * @param {{nom?:string, besoin?:string, urgence?:string, telephone?:string, email?:string}} raw
- * @returns {{nom:string, besoin:string, urgence:'immediate'|'haute'|'normale', telephone:string|null, email:string|null, complet:boolean, manquants:string[]}}
+ * @param {{nom?:string, besoin?:string, urgence?:string, telephone?:string, email?:string, ville?:string, adresse?:string}} raw
+ * @returns {{nom:string, besoin:string, urgence:'immediate'|'haute'|'normale', telephone:string|null, email:string|null, ville:string|null, adresse:string|null, complet:boolean, manquants:string[]}}
  */
 export function qualify(raw = {}) {
   const nom = (raw.nom || '').trim();
   const besoin = (raw.besoin || '').trim();
   const telephone = normalizePhone(raw.telephone);
   const email = normEmail(raw.email);
+  // Where the job is: the town decides the service area, the address goes to the calendar and the recap.
+  const ville = String(raw.ville ?? '').trim() || null;
+  const adresse = String(raw.adresse ?? '').trim() || null;
   // Urgency comes from the level the agent states and from the words of the need; the higher wins,
   // so "normale" from the agent never hides a "fuite" in the description.
   const explicit = LEVELS.includes(raw.urgence) ? raw.urgence : null;
@@ -45,7 +48,7 @@ export function qualify(raw = {}) {
   if (!besoin) manquants.push('besoin');
   if (!telephone && !email) manquants.push('contact');
 
-  return { nom, besoin, urgence, telephone, email, complet: manquants.length === 0, manquants };
+  return { nom, besoin, urgence, telephone, email, ville, adresse, complet: manquants.length === 0, manquants };
 }
 
 /**
@@ -57,5 +60,8 @@ export function mergeCaller(earlier, later) {
   if (!later) return earlier;
   const pick = (k) => (later[k] !== null && later[k] !== undefined && later[k] !== '' ? later[k] : earlier[k] ?? null);
   const urgence = LEVELS.indexOf(later.urgence) >= LEVELS.indexOf(earlier.urgence) ? later.urgence : earlier.urgence;
-  return qualify({ nom: pick('nom'), besoin: pick('besoin'), urgence, telephone: pick('telephone'), email: pick('email') });
+  return qualify({
+    nom: pick('nom'), besoin: pick('besoin'), urgence, telephone: pick('telephone'), email: pick('email'),
+    ville: pick('ville'), adresse: pick('adresse'),
+  });
 }

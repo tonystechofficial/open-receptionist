@@ -165,3 +165,13 @@ test('records older than the cut are deleted from every table, newer ones stay',
   assert.equal((await store.all()).appointments.length, 1);
   assert.equal((await store.attemptsSince('2000-01-01T00:00:00.000Z')).length, 1);
 });
+
+test('the town and the address of the job are stored with the call and the appointment', { skip }, async () => {
+  const store = d1Store(await d1Binding());
+  const caller = { nom: 'Jean', besoin: 'fuite', urgence: 'normale', telephone: '+33612345678', email: null, ville: 'Mérignac', adresse: '12 rue des Lilas', complet: true };
+  await store.upsertCall('c7', { caller });
+  await store.saveAppointment({ callId: 'c7', at: '2026-10-30T08:00:00.000Z', label: 'x', caller, createdAt: new Date().toISOString() });
+  assert.equal((await store.getCall('c7')).caller.ville, 'Mérignac');
+  assert.equal((await store.getCall('c7')).caller.adresse, '12 rue des Lilas');
+  assert.equal((await store.findAppointmentByCallId('c7')).caller.adresse, '12 rue des Lilas');
+});

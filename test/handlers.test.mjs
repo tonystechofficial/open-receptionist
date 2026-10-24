@@ -327,3 +327,51 @@ test('without an email provider the recap email is recorded as failed, not skipp
   assert.equal(recap.email.status, 'failed');
   assert.match(recap.email.reason, /email/);
 });
+
+// Business information (2026-10-24): the service area is enforced by the webhook, not left to the prompt.
+const AREA = { infos: { zone: ['Bordeaux', 'Mérignac'], tarifsUrl: 'https://plomberie-dupont.fr/tarifs' } };
+
+test('a request from a town outside the area is noted, and the agent is told to say so', async () => {
+  const { deps } = setup({ config: AREA });
+  const r = first(await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'fuite', ville: 'Arcachon' }), deps));
+  assert.match(r.result, /n'intervient pas/);
+  assert.equal((await deps.store.getCall('call_1')).caller.ville, 'Arcachon');
+});
+
+test('no slot is offered for a town outside the area', async () => {
+  const { deps } = setup({ config: AREA });
+  const r = first(await H.handleToolCall(tool('verifier_dispos', { ville: 'Arcachon' }), deps));
+  assert.match(r.result, /n'intervient pas/);
+  assert.doesNotMatch(r.result, /option 1/);
+});
+
+test('slots are offered for a town in the area, written any way', async () => {
+  const { deps } = setup({ config: AREA });
+  const r = first(await H.handleToolCall(tool('verifier_dispos', { ville: 'merignac' }), deps));
+  assert.match(r.result, /option 1/);
+});
+
+test('with an area set, no booking happens before the town is known', async () => {
+  const { cal, deps } = setup({ config: AREA });
+  const r = first(await H.handleToolCall(tool('prendre_rdv', { creneau: '2026-10-23T07:30:00Z', nom: 'Jean Dupont', besoin: 'fuite' }), deps));
+  assert.equal(cal.booked.length, 0);
+  assert.match(r.result, /ville/);
+});
+
+test('a booking for a town outside the area is refused', async () => {
+  const { cal, deps } = setup({ config: AREA });
+  const r = first(await H.handleToolCall(tool('prendre_rdv', { creneau: '2026-10-23T07:30:00Z', nom: 'Jean Dupont', besoin: 'fuite', ville: 'Arcachon' }), deps));
+  assert.equal(cal.booked.length, 0);
+  assert.match(r.result, /n'intervient pas/);
+});
+
+test('a booking in the area carries the address to the calendar and the rates link to the caller', async () => {
+  const { cal, sent, deps } = setup({ config: AREA });
+  await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'fuite sous évier', ville: 'Mérignac', adresse: '12 rue des Lilas' }), deps);
+  await H.handleToolCall(tool('prendre_rdv', { creneau: '2026-10-23T07:30:00Z' }, { id: 't2' }), deps);
+  assert.equal(cal.booked.length, 1);
+  assert.match(cal.booked[0].notes, /12 rue des Lilas, Mérignac/);
+  assert.ok(callerSms(sent)[0].content.includes('https://plomberie-dupont.fr/tarifs'));
+  await H.handleCallReport(endOfCall(), deps);
+  assert.match(sent.email[0].text, /Adresse : 12 rue des Lilas, Mérignac/);
+});

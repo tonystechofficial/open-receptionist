@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS calls (
   urgence       TEXT,                     -- immediate | haute | normale
   telephone     TEXT,                     -- E.164, e.g. +33612345678
   email         TEXT,
+  ville         TEXT,                     -- the town of the job, checked against the service area
+  adresse       TEXT,                     -- the street address of the job
   complet       INTEGER NOT NULL DEFAULT 0,
   status        TEXT,                     -- rdv | a_rappeler
   urgent        INTEGER NOT NULL DEFAULT 0,
@@ -33,6 +35,8 @@ CREATE TABLE IF NOT EXISTS appointments (
   besoin      TEXT,
   telephone   TEXT,
   email       TEXT,
+  ville       TEXT,
+  adresse     TEXT,
   urgence     TEXT,
   booking_ref TEXT,                       -- the calendar's booking uid
   created_at  TEXT NOT NULL

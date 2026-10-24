@@ -15,14 +15,23 @@ business's calendar or a call-back request delivered to the owner.
   major leak), those instructions are given before anything else, and the call is never ended by the
   receptionist during an emergency.
 - Every caller who is turned away or cannot be served is told to dial 112 in an emergency.
-- The receptionist gives no firm price and no diagnosis, and never reads a technical date or an
-  identifier aloud.
+- The receptionist answers questions about the business (services, the area it serves, published
+  rates, payment methods, common questions) only with what the business wrote, word for word, one
+  answer per question, never as a recited list. What is not written, it does not know.
+- It never prices a specific job and never diagnoses: the exact price comes in a written quote before
+  any work. When the business publishes a call-out fee or says whether the quote is free, the caller
+  hears it once before booking, so the booking is made knowing the price (French home-repair trades
+  must give these prices before the work, arrêté du 24 janvier 2017).
+- It never reads a technical date or an identifier aloud.
 
 **Bookings**
 
 - Only slots read from the business's calendar during the call are offered, at most two at a time,
   spoken in Paris time.
 - A booking needs a name and a way to call back; the caller's own number counts.
+- When the business serves a defined area, the town of the job is known before any slot is offered,
+  and a town outside the area gets no slot and no booking, whatever the caller says. The address of
+  the job reaches the calendar and the owner's recap.
 - One booking per call at most. A slot taken between the offer and the booking is never double-booked:
   the caller is offered the next free slots instead.
 - When the calendar cannot be read or written, the caller is promised a call-back, never left in
@@ -35,7 +44,8 @@ business's calendar or a call-back request delivered to the owner.
 - A recap that reached nobody is not counted as sent: it is tried again if the end of the call is
   reported again, and it is reported to the operator.
 - The caller receives one confirmation SMS per booking, only on a mobile number in an allowed country
-  (France by default), never on a landline.
+  (France by default), never on a landline. When the business publishes its rates online, the SMS
+  carries the link, so the prices also reach the caller in writing.
 
 **Cost bounds**
 
@@ -113,6 +123,9 @@ business's calendar or a call-back request delivered to the owner.
 - A caller who cannot be booked ends the call with a call-back request that reaches the owner by
   email, marked urgent when it is urgent.
 - A caller reporting a gas smell hears the business's safety instructions before any slot is offered.
+- A caller asking the call-out fee hears the published one, word for word; a caller asking the price
+  of a specific job hears the published flat price if there is one, otherwise that the price comes in
+  a quote; a caller from a town outside the area is told so and offered no slot.
 - A number calling for the fifth time within an hour is turned away before the receptionist answers
   and hears 112 for emergencies; a blocked number's call is refused without being answered.
 - No call goes past 5 minutes, and a silent line closes after 30 seconds.

@@ -63,6 +63,7 @@ function envConfig(env) {
     timeZone: env.TIME_ZONE || undefined,
     smsSender: env.SMS_SENDER || undefined,
     smsCountries: list(env.SMS_COUNTRIES),
+    infos: { zone: list(env.CLIENT_ZONE), tarifsUrl: env.CLIENT_TARIFS_URL || undefined },
     confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
     calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
     notify: { email: list(env.NOTIFY_EMAIL), sms: list(env.NOTIFY_SMS) },

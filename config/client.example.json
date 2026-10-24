@@ -15,5 +15,22 @@
   "maxDurationSeconds": 300,
   "silenceTimeoutSeconds": 30,
   "recordingEnabled": false,
+  "infos": {
+    "prestations": ["recherche et réparation de fuite", "débouchage", "remplacement de chauffe-eau", "dépannage de robinetterie"],
+    "horsPrestations": ["climatisation", "chauffage au gaz"],
+    "zone": ["Bordeaux", "Mérignac", "Pessac", "Talence", "Bègles", "Le Bouscat"],
+    "tarifs": {
+      "deplacement": "49 € TTC, offert si les travaux sont réalisés",
+      "tauxHoraire": "65 € TTC de l'heure, décomptés par quart d'heure",
+      "forfaits": ["débouchage d'évier ou de lavabo : 89 € TTC", "remplacement d'un mécanisme de chasse d'eau : 119 € TTC, pièce comprise"],
+      "devis": "gratuit, remis avant les travaux"
+    },
+    "paiement": ["carte bancaire", "chèque", "virement"],
+    "faq": [
+      { "question": "Intervenez-vous le week-end ?", "reponse": "Le samedi matin pour les urgences, avec une majoration de 30 %." },
+      { "question": "Travaillez-vous pour les syndics et les bailleurs ?", "reponse": "Oui, sur bon d'intervention." }
+    ],
+    "tarifsUrl": "https://plomberie-dupont.fr/tarifs"
+  },
   "urgences": "Odeur de gaz : demande à la personne de sortir tout de suite avec tout le monde, de ne toucher à aucun interrupteur ni appareil électrique, de ne pas allumer de flamme, de fermer le robinet de gaz si c'est possible sans risque, puis d'appeler depuis l'extérieur le dépannage gaz : le 05 56 79 41 00 de Régaz-Bordeaux si le logement est à Bordeaux ou dans une commune desservie par Régaz, sinon Urgence Sécurité Gaz au 0 800 47 33 33, gratuit ; tous deux répondent jour et nuit. En cas de doute sur le numéro, de malaise ou d'odeur très forte, le 112. Ne prends pas de rendez-vous avant d'avoir donné ces consignes. Fuite d'eau importante : conseille de fermer le robinet d'arrêt général du logement et, si l'eau approche des prises ou du tableau électrique, de couper le courant au disjoncteur."
 }

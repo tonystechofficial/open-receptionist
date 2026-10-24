@@ -18,6 +18,8 @@ CLIENT_COMPANY = "Plomberie Dupont"
 CLIENT_METIER = "plomberie"
 CLIENT_HORAIRES = "du lundi au vendredi, de 8 h a 18 h"
 CLIENT_TELEPHONE = "05 56 12 34 56"   # given to the caller in the confirmation SMS
+CLIENT_ZONE = "Bordeaux, Mérignac, Pessac, Talence, Bègles, Le Bouscat"  # towns served; same list as infos.zone in config/client.json; empty = everywhere
+CLIENT_TARIFS_URL = "https://plomberie-dupont.fr/tarifs"  # optional: the published rates, linked in the confirmation SMS
 TIME_ZONE = "Europe/Paris"
 NOTIFY_EMAIL = "contact@plomberie-dupont.fr"   # required: the email recap is the record of every call
 NOTIFY_SMS = "06 12 34 56 78"         # optional: mobiles (06, 07) for the SMS recap, comma-separated

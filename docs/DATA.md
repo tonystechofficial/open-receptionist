@@ -21,13 +21,14 @@ there, during the call. That never depends on the platform's own data features.
 Three tables, created by `migrations/0001_init.sql` in Cloudflare D1:
 
 - **`calls`**, one row per call, keyed by the platform's call id: name, need, urgency, phone
-  (international form), email, whether the details are complete, the status (`rdv` or
+  (international form), email, the town and address of the job, whether the details are complete, the status (`rdv` or
   `a_rappeler`), the urgent flag, the two slots offered as options 1 and 2, the platform's summary,
   a note when the calendar failed, `recap_sent_at`, and `deliveries`: what was sent to whom after
   the call (the caller's confirmation SMS, the owner's recap by email and by SMS), each marked sent,
   failed with the provider's message, or skipped with the reason.
 - **`appointments`**, one row per booking: the call it came from, the UTC start, the French label sent
-  to the caller, the caller's details and the calendar's booking reference.
+  to the caller, the caller's details with the town and address of the job, and the calendar's
+  booking reference.
 - **`call_attempts`**, one row per incoming call the screen saw: the caller's number (empty when
   withheld), the time, allowed or refused and why, and Twilio's or Vapi's call id. It holds phone
   numbers, so the retention period applies to it too.

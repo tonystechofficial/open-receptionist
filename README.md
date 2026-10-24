@@ -52,14 +52,24 @@ A new client is a new config, not new code. See `config/client.example.json`:
   "calendar": { "provider": "calcom", "id": "123456" },
   "notify": { "email": ["contact@plomberie-dupont.fr"], "sms": ["33612345678"] },
   "smsSender": "Dupont",
+  "infos": {
+    "prestations": ["recherche et réparation de fuite", "débouchage", "..."],
+    "zone": ["Bordeaux", "Mérignac", "Pessac", "..."],
+    "tarifs": { "deplacement": "49 € TTC, offert si les travaux sont réalisés", "devis": "gratuit, remis avant les travaux" },
+    "tarifsUrl": "https://plomberie-dupont.fr/tarifs"
+  },
   "urgences": "Odeur de gaz : ... le 05 56 79 41 00 de Régaz-Bordeaux ..., sinon Urgence Sécurité Gaz au 0 800 47 33 33 ..."
 }
 ```
 
+The agent answers questions about the business word for word from `infos`, states the call-out fee
+once before booking, never quotes a specific job, and books only in the towns served
+([how, in the call](docs/FLOWS.md#15-questions-about-the-business-prices-and-the-service-area)).
+
 ## Quickstart
 
 ```bash
-npm test     # 204 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 224 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -234,8 +244,8 @@ Records live in **your** database; the voice platform is told to keep only metad
 
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
   real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, the flood
-  alert, the retention purge, the edge rule's plan, and the Worker's routing, authentication, fallback
-  and daily check (204 tests).
+  alert, the retention purge, the edge rule's plan, the business information and the service area,
+  and the Worker's routing, authentication, fallback and daily check (224 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

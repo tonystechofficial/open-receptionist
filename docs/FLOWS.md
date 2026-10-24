@@ -161,6 +161,31 @@ A wave cannot be stopped number by number, so the first call turned away for the
 withheld numbers emails the operator at once, once per hour per kind; a single number calling too
 often waits for the daily report. A failed alert never blocks the screening.
 
+## 15. Questions about the business, prices and the service area
+
+The business writes what callers may hear in `infos` (services, what it does not do, towns served,
+call-out fee, hourly rate, flat prices, whether the quote is free, payment methods, common questions).
+How it enters the call:
+
+1. **The town, early.** With a service area set, the agent asks the town of the job right after
+   understanding the need, then the address, and notes them. The webhook checks the town: outside
+   the area, the agent says the business does not work there and offers no slot. The webhook also
+   refuses to read slots or book before the town is known, or for a town outside the area, so the
+   rule holds even if the model forgets it.
+2. **Answers on demand.** « C'est combien le déplacement ? », « Vous faites les chauffe-eau ? »,
+   « Vous prenez la carte ? »: the agent answers in one or two sentences, word for word from `infos`.
+   It never recites the list. What is not written, it says the business will tell.
+3. **The price, once, before booking.** After offering the two slots and before booking, the agent
+   states the call-out fee and whether the quote is free, so the caller books knowing the price.
+4. **Never a quote.** Asked the price of a specific job, the agent gives the flat price if `infos`
+   lists one, otherwise says the exact price comes in a quote before the work. No diagnosis.
+5. **In writing.** With `tarifsUrl` set, the confirmation SMS ends with the link to the rates page.
+   The SMS may then take two segments.
+
+The town and the address go to the calendar booking's notes, to the owner's recap, and to the call
+record. The Worker enforces the area from `CLIENT_ZONE`; the agent learns it from `infos.zone` in
+`config/client.json`: keep both lists the same.
+
 ## Planned, not built
 
 - An owner dashboard served by the Worker: calls and appointments from D1, behind a token.

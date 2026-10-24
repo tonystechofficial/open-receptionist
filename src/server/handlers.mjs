@@ -4,8 +4,9 @@
 // webhook would leave the caller in silence. See docs/FLOWS.md for each flow in plain words.
 import { qualify, mergeCaller } from '../core/qualify.mjs';
 import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant, withoutSlot } from '../core/slots.mjs';
-import { confirmationSms, ownerRecap } from '../core/messages.mjs';
+import { confirmationSms, ownerRecap, jobPlace } from '../core/messages.mjs';
 import { normalizePhone, smsRefusal } from '../core/phone.mjs';
+import { inZone } from '../core/zone.mjs';
 import { screenIncoming, recordUnroutable } from './screening.mjs';
 import * as vapi from '../providers/voice/vapi.mjs';
 
@@ -104,6 +105,15 @@ export async function handleCallReport(message, deps) {
 // ---------------------------------------------------------------- tools
 
 async function checkAvailability(args, ctx) {
+  // The service area is checked here, not left to the prompt: no slot is read for a town the
+  // business does not serve, and none before the town is known when an area is set.
+  const existing = await ctx.deps.store.getCall(ctx.callId);
+  const town = args.ville || existing?.caller?.ville;
+  if (args.ville) await ctx.deps.store.upsertCall(ctx.callId, { caller: mergeCaller(existing?.caller ?? null, qualify({ ville: args.ville })) });
+  const served = inZone(town, ctx.config.infos?.zone);
+  if (served === null) return "Demande d'abord la ville de l'intervention, puis rappelle verifier_dispos avec ville.";
+  if (served === false) return outOfZone(town, ctx);
+
   const urgence = qualify({ urgence: args.urgence }).urgence;
   const preferredDay = resolvePreferredDay(args.jour, ctx.now, ctx.timeZone);
   const days = Math.min(30, Math.max(clampDays(args.jours), preferredDay ? daysUntilDate(preferredDay, ctx) + 1 : 0));
@@ -142,10 +152,17 @@ async function book(args, ctx) {
 
   const caller = mergeCaller(existing?.caller ?? null, qualify({
     nom: args.nom, besoin: args.besoin, urgence: args.urgence, telephone: args.telephone || ctx.callerNumber, email: args.email,
+    ville: args.ville, adresse: args.adresse,
   }));
   if (!caller.complet) {
     await store.upsertCall(ctx.callId, { caller });
     return `Il manque ${caller.manquants.map((m) => MISSING[m]).join(' et ')}. Demande-le à l'appelant avant de réserver, puis rappelle prendre_rdv.`;
+  }
+  const served = inZone(caller.ville, ctx.config.infos?.zone);
+  if (served !== true) {
+    await store.upsertCall(ctx.callId, { caller });
+    if (served === null) return "Il manque la ville de l'intervention. Demande-la avant de réserver, puis rappelle prendre_rdv avec ville.";
+    return outOfZone(caller.ville, ctx);
   }
   if (!start) return "Créneau non reconnu. Rappelle verifier_dispos et propose les options qu'il donne.";
 
@@ -156,7 +173,7 @@ async function book(args, ctx) {
       name: caller.nom,
       email: caller.email ?? undefined,
       phone: caller.telephone ?? undefined,
-      notes: caller.besoin,
+      notes: [caller.besoin, jobPlace(caller)].filter(Boolean).join(' - '),
       timeZone: ctx.timeZone,
       metadata: { urgence: caller.urgence, callId: ctx.callId },
     });
@@ -197,13 +214,22 @@ async function recordRequest(args, ctx) {
   const existing = await ctx.deps.store.getCall(ctx.callId);
   const caller = mergeCaller(existing?.caller ?? null, qualify({
     nom: args.nom, besoin: args.besoin, urgence: args.urgence, telephone: args.telephone || ctx.callerNumber, email: args.email,
+    ville: args.ville, adresse: args.adresse,
   }));
   await ctx.deps.store.upsertCall(ctx.callId, { caller });
+  const served = inZone(caller.ville, ctx.config.infos?.zone);
+  if (served === false) return `Demande notée. ${outOfZone(caller.ville, ctx)}`;
   const urgent = caller.urgence === 'immediate' ? ' Elle est marquée urgente.' : '';
   const missing = caller.manquants.length
     ? ` Il manque encore ${caller.manquants.map((m) => MISSING[m]).join(' et ')} : demande-le si possible.`
     : '';
-  return `Demande notée.${urgent}${missing}`;
+  const town = served === null ? " Demande aussi la ville de l'intervention." : '';
+  return `Demande notée.${urgent}${missing}${town}`;
+}
+
+/** What the agent says when the business does not serve the caller's town: no slot, no booking. */
+function outOfZone(town, ctx) {
+  return `${ctx.company} n'intervient pas à ${town}. Dis-le poliment à l'appelant, sans proposer de créneau. S'il a un besoin dans une commune desservie, reprends avec cette commune.`;
 }
 
 // ---------------------------------------------------------------- helpers
@@ -264,7 +290,7 @@ async function confirmToCaller(caller, label, ctx) {
   try {
     await ctx.deps.notify.sms({
       to,
-      content: confirmationSms({ company: ctx.company, label, contactPhone: ctx.config.telephone }),
+      content: confirmationSms({ company: ctx.company, label, contactPhone: ctx.config.telephone, tarifsUrl: ctx.config.infos?.tarifsUrl }),
       sender: ctx.config.smsSender,
     });
     return { status: 'sent', to, at };

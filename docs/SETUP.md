@@ -32,6 +32,11 @@ command below as written; PowerShell variants are given where the syntax differs
 - the company name, the trade, the opening hours, and the phone number customers can call back on;
 - who receives the recap after each call: at least one email address, the record of every call,
   and optionally mobile numbers for an SMS on top;
+- what callers may be told: the services, what they do not do, the towns they serve, and their
+  published rates (call-out fee, hourly rate, flat prices, whether the quote is free, and the page
+  where the rates are online). Home-repair trades must give these prices before any work (arrêté du
+  24 janvier 2017), so most already have them written down. Add the payment methods and a few common
+  questions with their answers;
 - the appointment type: its name, its duration, the buffer between visits, and how much notice
   they need before an appointment;
 - the calendar the bookings should land in;
@@ -134,7 +139,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 204 tests, nothing to install
+npm test        # 224 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -178,6 +183,8 @@ Edit the `[vars]` block of `wrangler.toml`:
 | `CLIENT_METIER` | the trade, for example `plomberie` |
 | `CLIENT_HORAIRES` | the opening hours, in words |
 | `CLIENT_TELEPHONE` | the number given to callers in the confirmation SMS |
+| `CLIENT_ZONE` | the towns served, comma-separated: the same list as `infos.zone` in step 4.2. Empty means everywhere |
+| `CLIENT_TARIFS_URL` | optional: the page with the published rates, linked at the end of the confirmation SMS |
 | `TIME_ZONE` | `Europe/Paris` |
 | `NOTIFY_EMAIL` | the recap recipients, comma-separated. Required: the email is the record of every call |
 | `NOTIFY_SMS` | optional: mobile numbers (`06`, `07`) for an SMS recap, comma-separated, written as usual, such as `06 12 34 56 78`. A landline is refused |
@@ -271,6 +278,10 @@ Fill it with the **same** company, trade, hours, phone and recipients as the `[v
 - `voice`: a French voice. An ElevenLabs French voice sounds far more natural than the default;
 - `urgences`: the emergency instructions the client validated in writing, with the gas emergency
   number of their area;
+- `infos`: what callers may be told, written as the client wants it said: `prestations`,
+  `horsPrestations`, `zone` (the towns served, the same list as `CLIENT_ZONE`), `tarifs`
+  (`deplacement`, `tauxHoraire`, `forfaits`, `devis`), `paiement`, `faq` and `tarifsUrl`. The agent
+  reads them word for word and invents nothing else; see [FLOWS.md](FLOWS.md#15-questions-about-the-business-prices-and-the-service-area);
 - `notify`, `smsSender` and `confirmation`, matching the Worker's settings. `notify.email` is required.
 
 `config/client.json` is ignored by git. The Worker reads `wrangler.toml` and the assistant script

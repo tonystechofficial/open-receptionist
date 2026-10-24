@@ -77,6 +77,8 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
     timeZone: env.TIME_ZONE || undefined,
     smsSender: env.SMS_SENDER || undefined,
     smsCountries: splitList(env.SMS_COUNTRIES),
+    // The service area is enforced here; the rest of the business information lives in the assistant.
+    infos: { zone: splitList(env.CLIENT_ZONE), tarifsUrl: env.CLIENT_TARIFS_URL || undefined },
     confirmation: { sms: env.CONFIRM_CALLER_SMS !== 'false' },
     calendar: { provider: 'calcom', id: env.CALCOM_EVENT_TYPE_ID },
     notify: { email: splitList(env.NOTIFY_EMAIL), sms: splitList(env.NOTIFY_SMS) },

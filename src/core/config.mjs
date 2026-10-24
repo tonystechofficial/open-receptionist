@@ -70,6 +70,31 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
     errors.push('silenceTimeoutSeconds must be a whole number of seconds from 10 to 120');
   }
 
+  // What the agent may tell callers about the business. It reads these out exactly as written, so
+  // their shape is checked: a typo must not turn into something said to a caller.
+  const infos = cfg.infos ?? {};
+  const texts = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string');
+  for (const field of ['prestations', 'horsPrestations', 'zone', 'paiement']) {
+    if (infos[field] !== undefined && !texts(infos[field])) errors.push(`infos.${field} must be a list of texts`);
+  }
+  if (infos.tarifs !== undefined) {
+    const t = infos.tarifs;
+    if (typeof t !== 'object' || t === null) errors.push('infos.tarifs must be an object');
+    else {
+      for (const k of ['deplacement', 'tauxHoraire', 'devis']) {
+        if (t[k] !== undefined && typeof t[k] !== 'string') errors.push(`infos.tarifs.${k} must be a text`);
+      }
+      if (t.forfaits !== undefined && !texts(t.forfaits)) errors.push('infos.tarifs.forfaits must be a list of texts');
+    }
+  }
+  const faqOk = (f) => f && typeof f.question === 'string' && typeof f.reponse === 'string';
+  if (infos.faq !== undefined && !(Array.isArray(infos.faq) && infos.faq.every(faqOk))) {
+    errors.push('infos.faq must be a list of { question, reponse } texts');
+  }
+  if (infos.tarifsUrl !== undefined && !/^https:\/\/\S+$/.test(String(infos.tarifsUrl))) {
+    errors.push('infos.tarifsUrl must be an https:// address');
+  }
+
   if (providers) {
     const textsCallers = (cfg.confirmation?.sms ?? DEFAULTS.confirmation.sms) !== false;
     if (!providers.email) warnings.push('no email provider key (RESEND_API_KEY): the recap email cannot be sent');
@@ -90,6 +115,7 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   config.confirmation = { ...DEFAULTS.confirmation, ...(cfg.confirmation || {}) };
   config.notify = { ...notify, email: emails, sms };
   config.smsCountries = smsCountries;
+  config.infos = { ...infos, zone: texts(infos.zone) ? infos.zone : [] };
 
   return { ok: errors.length === 0, errors, warnings, config };
 }

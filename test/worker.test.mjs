@@ -2,7 +2,7 @@
 // The store is in memory and Cal.com is a fake fetch, so nothing leaves the machine.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorker } from '../worker/index.mjs';
+import { createWorker, buildDeps } from '../worker/index.mjs';
 import { memoryStore } from '../src/db/store.mjs';
 
 const ENV = {
@@ -343,4 +343,10 @@ test('Twilio: the first call refused by the hourly total emails the operator rig
     assert.deepEqual(seen.mails[0].to, ['tony@example.fr']);
     assert.match(seen.mails[0].subject, /vague/i);
   });
+});
+
+test('the Worker reads the service area and the rates page from its settings', () => {
+  const deps = buildDeps({ ...ENV, CLIENT_ZONE: 'Bordeaux, Mérignac', CLIENT_TARIFS_URL: 'https://plomberie-dupont.fr/tarifs' }, () => memoryStore());
+  assert.deepEqual(deps.config.infos.zone, ['Bordeaux', 'Mérignac']);
+  assert.equal(deps.config.infos.tarifsUrl, 'https://plomberie-dupont.fr/tarifs');
 });

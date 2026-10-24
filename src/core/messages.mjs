@@ -25,11 +25,21 @@ export function formatPhoneFr(phone) {
   return national.replace(/(\d{2})(?=\d)/g, '$1 ');
 }
 
-/** The SMS the caller receives once the appointment is booked. `label` is an absolute, written date. */
-export function confirmationSms({ company, label, contactPhone }) {
+/**
+ * The SMS the caller receives once the appointment is booked. `label` is an absolute, written date.
+ * With a published rates page, its link puts the price information in writing (home repair in France
+ * must give it before the work); the SMS may then take two segments.
+ */
+export function confirmationSms({ company, label, contactPhone, tarifsUrl }) {
   const parts = [`${company} : votre rendez-vous est confirmé pour le ${label}.`];
   if (contactPhone) parts.push(`Pour le modifier, appelez le ${formatPhoneFr(contactPhone)}.`);
+  if (tarifsUrl) parts.push(`Tarifs : ${tarifsUrl}`);
   return toGsm7(parts.join(' '));
+}
+
+/** Where the job is, as one line: "12 rue des Lilas, Mérignac". Empty when unknown. */
+export function jobPlace(caller) {
+  return [caller?.adresse, caller?.ville].filter(Boolean).join(', ');
 }
 
 const URGENCE_LABEL = { immediate: 'immédiate', haute: 'sous 48 h', normale: 'normale' };
@@ -56,6 +66,7 @@ export function ownerRecap({ company, caller = {}, appointment = null, summary =
     `Besoin : ${c.besoin || 'non précisé'}`,
     `Urgence : ${URGENCE_LABEL[c.urgence] || 'normale'}`,
     `Téléphone : ${phone || 'non donné'}`,
+    `Adresse : ${jobPlace(c) || 'non donnée'}`,
     `Email : ${c.email || 'non donné'}`,
     `Rendez-vous : ${rdv || 'aucun, à rappeler'}`,
   ];
@@ -63,7 +74,7 @@ export function ownerRecap({ company, caller = {}, appointment = null, summary =
   const text = lines.join('\n');
   const html = `<p>${lines.map(escapeHtml).join('<br>')}</p><p style="color:#666">${escapeHtml(company ?? '')}</p>`;
   const sms = toGsm7(
-    `${urgent ? 'URGENT ' : ''}${c.nom || 'Appelant'}${phone ? ` ${phone}` : ''} : ${truncate(c.besoin || 'demande', 60)}. ${rdv ? `RDV ${rdv}` : 'à rappeler'}.`,
+    `${urgent ? 'URGENT ' : ''}${c.nom || 'Appelant'}${phone ? ` ${phone}` : ''} : ${truncate(c.besoin || 'demande', 60)}${c.ville ? ` (${c.ville})` : ''}. ${rdv ? `RDV ${rdv}` : 'à rappeler'}.`,
   );
   return { subject, text, html, sms, urgent };
 }

@@ -65,3 +65,12 @@ test('mergeCaller tolerates a missing side', () => {
   assert.equal(mergeCaller(null, only).nom, 'Jean');
   assert.equal(mergeCaller(only, null).nom, 'Jean');
 });
+
+test('the town and the address of the job are kept, and a later step fills what an earlier one missed', () => {
+  const first = qualify({ nom: 'Jean', besoin: 'fuite', telephone: '0612345678', ville: ' Mérignac ' });
+  assert.equal(first.ville, 'Mérignac');
+  assert.equal(first.adresse, null);
+  const merged = mergeCaller(first, qualify({ adresse: '12 rue des Lilas' }));
+  assert.equal(merged.ville, 'Mérignac');
+  assert.equal(merged.adresse, '12 rue des Lilas');
+});

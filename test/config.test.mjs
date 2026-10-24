@@ -162,3 +162,27 @@ test('an owner SMS number abroad is refused unless its country is listed', () =>
   assert.equal(r.ok, true, r.errors.join('; '));
   assert.deepEqual(validateClientConfig(base).config.smsCountries, ['33']);
 });
+
+test('the business information is kept as written, the area normalised to a list of towns', () => {
+  const infos = {
+    prestations: ['Recherche de fuite', 'Débouchage'],
+    horsPrestations: ['Climatisation'],
+    zone: ['Bordeaux', 'Mérignac'],
+    tarifs: { deplacement: '49 € TTC', tauxHoraire: '65 € TTC de l\'heure', forfaits: ['Débouchage évier : 89 € TTC'], devis: 'gratuit' },
+    paiement: ['carte bancaire', 'chèque'],
+    faq: [{ question: 'Intervenez-vous le week-end ?', reponse: 'Oui, le samedi matin.' }],
+    tarifsUrl: 'https://plomberie-dupont.fr/tarifs',
+  };
+  const r = validateClientConfig({ ...base, infos });
+  assert.equal(r.ok, true, r.errors.join('; '));
+  assert.deepEqual(r.config.infos, infos);
+  assert.deepEqual(validateClientConfig(base).config.infos, { zone: [] });
+});
+
+test('business information that could mislead a caller is refused', () => {
+  const bad = validateClientConfig({ ...base, infos: { tarifsUrl: 'http://plomberie-dupont.fr/tarifs', zone: 'Bordeaux', faq: [{ question: 'Prix ?' }] } });
+  assert.equal(bad.ok, false);
+  for (const field of ['tarifsUrl', 'zone', 'faq']) {
+    assert.ok(bad.errors.some((e) => e.includes(field)), `${field}: ${bad.errors.join('; ')}`);
+  }
+});

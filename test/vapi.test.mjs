@@ -80,3 +80,37 @@ test('tool results carry the tool name and the call id Vapi sent', () => {
     { results: [{ name: 'x', toolCallId: 'a', result: 'ok' }] },
   );
 });
+
+// Business information (2026-10-24): what the agent may say about services, area and prices.
+const INFOS = {
+  prestations: ['Recherche de fuite', 'Débouchage'], horsPrestations: ['Climatisation'], zone: ['Bordeaux', 'Mérignac'],
+  tarifs: { deplacement: '49 € TTC', tauxHoraire: "65 € TTC de l'heure", forfaits: ['Débouchage évier : 89 € TTC'], devis: 'gratuit' },
+  paiement: ['carte bancaire'], faq: [{ question: 'Intervenez-vous le week-end ?', reponse: 'Oui, le samedi matin.' }],
+};
+
+test('the prompt carries the business information as written, and the rule to give it only as written', () => {
+  const { config: withInfos } = validateClientConfig({ ...config, infos: INFOS });
+  const prompt = vapi.buildAssistant(withInfos, {}).model.messages[0].content;
+  for (const text of ['Recherche de fuite', 'Climatisation', 'Mérignac', '49 € TTC', "65 € TTC de l'heure", 'Débouchage évier : 89 € TTC', 'carte bancaire', 'Oui, le samedi matin.']) {
+    assert.ok(prompt.includes(text), text);
+  }
+  assert.match(prompt, /telles? quelles?/i);
+  assert.match(prompt, /devis/);
+  assert.match(prompt, /ville/i);
+});
+
+test('without published rates the agent gives no price at all', () => {
+  const prompt = vapi.buildAssistant(config, {}).model.messages[0].content;
+  assert.match(prompt, /aucun prix/i);
+});
+
+test('the tools take the town and the address of the job', () => {
+  const a = vapi.buildAssistant(config, {});
+  for (const t of functionTools(a)) {
+    if (t.function.name === 'noter_demande' || t.function.name === 'prendre_rdv') {
+      assert.ok(t.function.parameters.properties.ville, t.function.name);
+      assert.ok(t.function.parameters.properties.adresse, t.function.name);
+    }
+    if (t.function.name === 'verifier_dispos') assert.ok(t.function.parameters.properties.ville);
+  }
+});
