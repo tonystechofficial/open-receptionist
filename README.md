@@ -93,6 +93,7 @@ npx wrangler secret put CALCOM_API_KEY
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio; or BREVO_API_KEY for Brevo
 npx wrangler secret put TWILIO_AUTH_TOKEN
+npm run cal:setup                                          # creates the Cal.com event type (asks the API key again), writes its id
 npm run configure                                          # asks the business's settings one by one, explained and checked
 npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev
 curl https://open-receptionist.<you>.workers.dev/health    # {"ok":true}

@@ -83,8 +83,11 @@ Cloudflare as well.
 Steps 2 to 5 can also be done by a script, once the API key exists and the calendar is connected:
 
 ```bash
-CALCOM_API_KEY=cal_live_... npm run cal:setup        # PowerShell: $env:CALCOM_API_KEY = "cal_live_..."; npm run cal:setup
+npm run cal:setup
 ```
+
+It asks for the API key, masked: the copy set with `wrangler secret put` cannot be read back, only the
+deployed Worker sees it. The key is used for this run only, never stored or printed.
 
 It creates an "Intervention" event type (one hour, 30 minutes after for the road, bookable one hour
 ahead, phone required and email optional), or keeps the one already there, and writes its id into

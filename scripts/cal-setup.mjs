@@ -1,17 +1,54 @@
 // Creates the Cal.com event type the receptionist books into (docs/SETUP.md step 1.2), or finds it
 // if it already exists, then writes its id into wrangler.toml and config/client.json. The API key is
-// read from the environment, never from a file or an argument, and never printed.
+// asked for, masked, unless CALCOM_API_KEY is set; it is used for this run only, never stored or
+// printed. (The copy set with `wrangler secret put` cannot be read back: only the Worker sees it.)
 //
-//   PowerShell:  $env:CALCOM_API_KEY = "cal_live_..."; npm run cal:setup
-//   Bash:        CALCOM_API_KEY=cal_live_... npm run cal:setup
-//   Options:     npm run cal:setup -- --title="Intervention" --minutes=60 --buffer=30 --notice=60
+//   npm run cal:setup
+//   Options: npm run cal:setup -- --title="Intervention" --minutes=60 --buffer=30 --notice=60
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { eventTypeBody, findEventType } from '../src/providers/calendar/calcom-setup.mjs';
 import { writeVars } from '../src/providers/hosting/wrangler-vars.mjs';
 
-const key = process.env.CALCOM_API_KEY;
+/** Reads one line; in a terminal, each typed character shows as *. */
+function askSecret(prompt) {
+  process.stdout.write(prompt);
+  const { stdin } = process;
+  if (!stdin.isTTY) {
+    const rl = createInterface({ input: stdin });
+    return new Promise((resolve) => rl.once('line', (line) => { rl.close(); resolve(line.trim()); }));
+  }
+  return new Promise((resolve) => {
+    let value = '';
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') {
+          stdin.setRawMode(false);
+          stdin.pause();
+          stdin.off('data', onData);
+          process.stdout.write('\n');
+          resolve(value.trim());
+          return;
+        }
+        if (ch === '\u0003') process.exit(130); // Ctrl+C
+        if (ch === '\u007f' || ch === '\b') {
+          if (value) { value = value.slice(0, -1); process.stdout.write('\b \b'); }
+        } else {
+          value += ch;
+          process.stdout.write('*');
+        }
+      }
+    };
+    stdin.on('data', onData);
+  });
+}
+
+const key = process.env.CALCOM_API_KEY || await askSecret('Cal.com API key (Settings > Developer > API keys), the same one as in wrangler secret: ');
 if (!key) {
-  console.error('CALCOM_API_KEY is not set. In PowerShell: $env:CALCOM_API_KEY = "cal_live_..."; npm run cal:setup');
+  console.error('No key given: nothing done.');
   process.exit(1);
 }
 const flag = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
