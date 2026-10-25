@@ -3,6 +3,8 @@
 name = "open-receptionist"
 main = "worker/index.mjs"
 compatibility_date = "2026-09-01"
+workers_dev = true      # the Worker answers at https://open-receptionist.<your-subdomain>.workers.dev
+preview_urls = false    # no extra public address per version
 
 # Create the database once in the EU jurisdiction (set at creation only), then write its id here:
 #   npx wrangler d1 create open-receptionist --jurisdiction eu
