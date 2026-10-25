@@ -6,10 +6,13 @@
   "license": "MIT",
   "author": "Tony's Tech",
   "repository": "github:tonystechofficial/open-receptionist",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "node --test",
     "assistant:create": "node vapi/create-assistant.mjs",
+    "cal:setup": "node scripts/cal-setup.mjs",
     "db:id": "node scripts/set-database-id.mjs",
     "db:init": "npx wrangler d1 migrations apply open-receptionist --remote",
     "db:init:local": "npx wrangler d1 migrations apply open-receptionist --local",

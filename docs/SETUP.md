@@ -80,6 +80,17 @@ Cloudflare as well.
    Otherwise callers who only give a phone number cannot be booked.
 5. Note the event type's numeric id, and create an API key under **Settings > Developer > API keys**.
 
+Steps 2 to 5 can also be done by a script, once the API key exists and the calendar is connected:
+
+```bash
+CALCOM_API_KEY=cal_live_... npm run cal:setup        # PowerShell: $env:CALCOM_API_KEY = "cal_live_..."; npm run cal:setup
+```
+
+It creates an "Intervention" event type (one hour, 30 minutes after for the road, bookable one hour
+ahead, phone required and email optional), or keeps the one already there, and writes its id into
+`wrangler.toml` and `config/client.json`. Options: `-- --title="Visite de devis" --minutes=30
+--buffer=15 --notice=0`. The working hours stay to set in Cal.com (**Availability**).
+
 ### 1.3 Vapi
 
 1. Create the account and add a payment method: the trial credit runs out after a few test calls.
@@ -139,7 +150,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 265 tests, nothing to install
+npm test        # 270 tests, nothing to install
 ```
 
 ## 3. Database and Worker

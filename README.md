@@ -69,7 +69,7 @@ once before booking, never quotes a specific job, and books only in the towns se
 ## Quickstart
 
 ```bash
-npm test     # 265 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 270 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -247,7 +247,7 @@ Records live in **your** database; the voice platform is told to keep only metad
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
   real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, the flood
   alert, the retention purge, the edge rule's plan, the business information and the service area,
-  and the Worker's routing, authentication, fallback and daily check (265 tests).
+  and the Worker's routing, authentication, fallback and daily check (270 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.
