@@ -37,22 +37,18 @@ In PowerShell, type \`curl.exe\` instead of \`curl\`.
 
 ## 2. Vapi (SETUP step 4)
 
-1. Dashboard > **API Keys**: copy the **private** key.
-2. Create a **Custom Credential**, type **Bearer Token**, header \`X-Vapi-Secret\`, value your
-   \`WEBHOOK_SECRET\`, no \`Bearer\` prefix. Copy its id (\`cred_...\`).
-3. Fill \`config/client.json\` with the same values as \`wrangler.toml\` (company, trade, hours, phone,
-   towns, recap email, sender, \`calendar.id\`${event}), plus \`infos\`, \`urgences\` and, to put
+1. Fill \`config/client.json\` with the same values as \`wrangler.toml\` (company, trade, hours, phone,
+   recap email, sender, \`calendar.id\`${event}), plus \`infos\`, \`urgences\` and, to put
    emergencies through to you, \`"transfert": { "numero": "06 .. .. .. .." }\`.
-4. Create the assistant:
+2. Put the Vapi private key (dashboard > **API Keys**) in \`.env.local\`: \`VAPI_PRIVATE_KEY=...\`
+3. Create the credential and the assistant (rerun after each change of \`config/client.json\`):
 
 \`\`\`bash
-VAPI_PRIVATE_KEY=<private key> VAPI_CREDENTIAL_ID=<cred_...> \\
-WEBHOOK_BASE_URL=${url} \\
-  node vapi/create-assistant.mjs config/client.json
+npm run vapi:setup
 \`\`\`
 
-Keep the assistant id it prints. To update the assistant later, run the same command with
-\`VAPI_ASSISTANT_ID=<assistant id>\` in front.
+It keeps \`WEBHOOK_SECRET\`, \`VAPI_CREDENTIAL_ID\` and \`VAPI_ASSISTANT_ID\` in \`.env.local\`. Try the
+assistant in the Vapi dashboard: **Assistants** > the assistant > **Talk to Assistant**.
 
 ## 3. The phone number (SETUP step 5)
 

@@ -22,6 +22,7 @@
     "cf:tail": "npx wrangler tail",
     "cf:rate-limit": "node scripts/cloudflare-rate-limit.mjs",
     "deploy": "node scripts/deploy.mjs",
-    "readme:local": "node scripts/readme-local.mjs"
+    "readme:local": "node scripts/readme-local.mjs",
+    "vapi:setup": "node scripts/vapi-setup.mjs"
   }
 }

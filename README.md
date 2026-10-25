@@ -69,7 +69,7 @@ once before booking, never quotes a specific job, and books only in the towns se
 ## Quickstart
 
 ```bash
-npm test     # 276 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 279 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -111,19 +111,20 @@ migration), copy into `wrangler.toml` any new setting of `wrangler.example.toml`
 
 Then on Vapi:
 
-1. Create a **Custom Credential** of type Bearer Token, header `X-Vapi-Secret`, value = your
-   `WEBHOOK_SECRET`, no `Bearer` prefix ([Vapi server authentication](https://docs.vapi.ai/server-url/server-authentication)).
-2. Build the assistant from your client config:
+1. Fill `config/client.json` from `config/client.example.json`: what the receptionist says (company,
+   hours, `infos`, `urgences`, `transfert`), with the same values as `wrangler.toml`.
+2. Put your Vapi private key in `.env.local` (ignored by git): `VAPI_PRIVATE_KEY=...`, then:
    ```bash
-   VAPI_PRIVATE_KEY=... VAPI_CREDENTIAL_ID=cred_... \
-   WEBHOOK_BASE_URL=https://open-receptionist.<you>.workers.dev \
-     node vapi/create-assistant.mjs config/client.json
+   npm run vapi:setup     # credential + assistant, from config/client.json; rerun after each change
    ```
+   It sets a new `WEBHOOK_SECRET` on the Worker and in a Vapi credential sent as `X-Vapi-Secret`,
+   creates or updates the assistant pointed at your Worker, keeps the ids and the secret in
+   `.env.local`, and checks `/api/check`. No secret is printed.
 3. Attach a phone number to the assistant. Buy the French `+33` number at Twilio, so one account
    carries the number and the SMS. It needs a regulatory bundle (identity and a French address), which
    takes a day or two; start on the number Vapi gives you, then import the Twilio number into Vapi.
-4. In Cal.com, make the event type's **phone number required and email optional**, so callers who only
-   give a number can be booked.
+4. In Cal.com, the event type's **phone number required and email optional** (`npm run cal:setup`
+   does it), so callers who only give a number can be booked.
 5. Run the **first real call checklist** at the end of [docs/FLOWS.md](docs/FLOWS.md).
 
 **Vercel instead:** `api/vapi.mjs` serves the same flows as a Node function. Set the env from
@@ -249,7 +250,7 @@ Records live in **your** database; the voice platform is told to keep only metad
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
   real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, the flood
   alert, the retention purge, the edge rule's plan, the business information and the service area,
-  and the Worker's routing, authentication, fallback and daily check (276 tests).
+  and the Worker's routing, authentication, fallback and daily check (279 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

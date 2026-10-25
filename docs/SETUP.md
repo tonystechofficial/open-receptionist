@@ -153,7 +153,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 276 tests, nothing to install
+npm test        # 279 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -298,6 +298,12 @@ all there is: past it, real calls fail too. Two settings make that flood harmles
    the free plan's 100,000 a day would run out.
 
 ## 4. The Vapi assistant
+
+**The short way:** once `config/client.json` is filled (step 4.2), put the Vapi private key in
+`.env.local` (`VAPI_PRIVATE_KEY=...`, ignored by git) and run `npm run vapi:setup`. It does steps 4.1
+and 4.3: a new `WEBHOOK_SECRET` on the Worker and in a Vapi credential sent as `X-Vapi-Secret`, then
+the assistant, created the first time and updated after, with the ids and the secret kept in
+`.env.local`, and a call to `/api/check` with that secret. The steps below do the same by hand.
 
 ### 4.1 Let Vapi authenticate to your Worker
 

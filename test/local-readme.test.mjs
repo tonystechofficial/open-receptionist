@@ -19,7 +19,7 @@ test('anything that is not an address is refused', () => {
 test('every command carries the address, and no placeholder of it is left', () => {
   const page = localReadme({ url: 'https://open-receptionist.tonystech.workers.dev', eventTypeId: '7633528' });
   assert.match(page, /curl https:\/\/open-receptionist\.tonystech\.workers\.dev\/health/);
-  assert.match(page, /WEBHOOK_BASE_URL=https:\/\/open-receptionist\.tonystech\.workers\.dev /);
+  assert.match(page, /npm run vapi:setup/);
   assert.match(page, /https:\/\/open-receptionist\.tonystech\.workers\.dev\/api\/twilio\/voice/);
   assert.match(page, /7633528/);
   assert.doesNotMatch(page, /<your-subdomain>|<you>/);
@@ -28,7 +28,7 @@ test('every command carries the address, and no placeholder of it is left', () =
 test('secrets stay placeholders: the page never holds one', () => {
   const page = localReadme({ url: 'https://w.example.workers.dev' });
   assert.match(page, /<WEBHOOK_SECRET>/);
-  assert.match(page, /VAPI_PRIVATE_KEY=<private key>/);
+  assert.match(page, /`VAPI_PRIVATE_KEY=\.\.\.`/);
 });
 
 // The address `npm run deploy` reads from wrangler's output file (WRANGLER_OUTPUT_FILE_PATH): one JSON
