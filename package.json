@@ -21,7 +21,7 @@
     "cf:dev": "npx wrangler dev --local",
     "cf:tail": "npx wrangler tail",
     "cf:rate-limit": "node scripts/cloudflare-rate-limit.mjs",
-    "deploy": "npx wrangler deploy",
+    "deploy": "node scripts/deploy.mjs",
     "readme:local": "node scripts/readme-local.mjs"
   }
 }

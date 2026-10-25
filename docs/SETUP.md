@@ -153,7 +153,7 @@ Twilio balance under 5, or fewer than 20 Brevo credits.
 ```bash
 git clone https://github.com/tonystechofficial/open-receptionist.git
 cd open-receptionist
-npm test        # 274 tests, nothing to install
+npm test        # 276 tests, nothing to install
 ```
 
 ## 3. Database and Worker
@@ -240,7 +240,9 @@ enabled = true
 npm run deploy
 ```
 
-The first deploy asks you to choose a `workers.dev` subdomain. Then check that the Worker answers:
+It also writes `README.local.md`, ignored by git: the remaining steps with your Worker's own address in
+every command (rewrite it with `npm run readme:local`). The first deploy asks you to choose a
+`workers.dev` subdomain. Then check that the Worker answers:
 
 ```bash
 curl https://open-receptionist.<your-subdomain>.workers.dev/health

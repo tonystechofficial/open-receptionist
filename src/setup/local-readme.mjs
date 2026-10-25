@@ -90,3 +90,16 @@ Then turn on **Zero Data Retention** in Vapi's organisation settings.
 - Rotate the webhook secret: \`npm run secret:webhook\`, and update the Vapi credential at once.
 `;
 }
+
+/**
+ * The Worker's address from wrangler's output file (WRANGLER_OUTPUT_FILE_PATH, one JSON entry per
+ * line): the https targets of the last deploy, a workers.dev one first. Null when there is none.
+ */
+export function deployedUrl(ndjson) {
+  const entries = String(ndjson ?? '').split(/\r?\n/).map((line) => {
+    try { return JSON.parse(line); } catch { return null; }
+  });
+  const last = entries.filter((e) => e?.type === 'deploy').at(-1);
+  const urls = (last?.targets ?? []).filter((t) => /^https:\/\/\S+$/.test(String(t).trim())).map(workerUrl).filter(Boolean);
+  return urls.find((u) => u.endsWith('.workers.dev')) ?? urls[0] ?? null;
+}

@@ -69,7 +69,7 @@ once before booking, never quotes a specific job, and books only in the towns se
 ## Quickstart
 
 ```bash
-npm test     # 274 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
+npm test     # 276 tests: core, flows, D1 SQL on SQLite, Worker routing and daily check. No dependencies, no keys.
 ```
 
 ## Deploy: Cloudflare Workers + D1 (free tier, EU)
@@ -95,8 +95,8 @@ npx wrangler secret put TWILIO_ACCOUNT_SID                 # SMS through Twilio;
 npx wrangler secret put TWILIO_AUTH_TOKEN
 npm run cal:setup                                          # creates the Cal.com event type (asks the API key again), writes its id
 npm run configure                                          # asks the business's settings one by one, explained and checked
-npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev
-npm run readme:local -- https://open-receptionist.<you>.workers.dev   # README.local.md: the next commands with your address
+npm run deploy                                             # -> https://open-receptionist.<you>.workers.dev, and README.local.md:
+                                                           #    the next commands below, with your own address
 curl https://open-receptionist.<you>.workers.dev/health    # {"ok":true}
 curl -H "x-vapi-secret: <WEBHOOK_SECRET>" https://open-receptionist.<you>.workers.dev/api/check
 # {"ok":true,"problems":[]}  -- otherwise each problem is spelled out
@@ -249,7 +249,7 @@ Records live in **your** database; the voice platform is told to keep only metad
 - **Tested:** the core decisions, every call flow end to end with fakes, the D1 migrations and SQL on
   real SQLite, the Twilio and Brevo adapters, the call limits, call screening by both methods, the flood
   alert, the retention purge, the edge rule's plan, the business information and the service area,
-  and the Worker's routing, authentication, fallback and daily check (274 tests).
+  and the Worker's routing, authentication, fallback and daily check (276 tests).
 - **Only a real call proves:** that Vapi fills in `{{customer.number}}` and delivers tool calls, that
   your Cal.com event type accepts phone-only bookings, and that SMS and email are delivered. The
   checklist in docs/FLOWS.md walks through each.

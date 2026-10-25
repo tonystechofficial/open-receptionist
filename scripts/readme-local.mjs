@@ -1,15 +1,23 @@
 // Writes README.local.md: the steps after the deploy, with this Worker's address in every command.
-// Run it after the first `npm run deploy`, with the address the deploy printed:
+// `npm run deploy` runs it with the address it just published; run it alone to rewrite the file:
 //
-//   npm run readme:local -- https://open-receptionist.<your-subdomain>.workers.dev
-//   npm run readme:local            (asks for the address)
+//   npm run readme:local                     (the address of the last npm run deploy)
+//   npm run readme:local -- https://...      (another address, such as a custom domain)
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { workerUrl, localReadme } from '../src/setup/local-readme.mjs';
+import { workerUrl, localReadme, deployedUrl } from '../src/setup/local-readme.mjs';
 import { readVars } from '../src/providers/hosting/wrangler-vars.mjs';
 
-let raw = process.argv[2];
+const output = new URL('../.wrangler/deploy-output.ndjson', import.meta.url);
+const arg = process.argv.slice(2).find((a) => !a.startsWith('--'));
+const fromDeploy = existsSync(output) ? deployedUrl(readFileSync(output, 'utf8')) : null;
+
+let raw = arg ?? fromDeploy;
 if (!raw) {
+  if (process.argv.includes('--from-deploy')) {
+    console.log('The deploy published no https address: README.local.md not written. Run npm run readme:local -- <address>.');
+    process.exit(0);
+  }
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   raw = await new Promise((resolve) => rl.question("Your Worker's address, as npm run deploy printed it: ", (a) => { rl.close(); resolve(a); }));
 }
@@ -22,7 +30,7 @@ if (!url) {
 const toml = new URL('../wrangler.toml', import.meta.url);
 const eventTypeId = existsSync(toml) ? readVars(readFileSync(toml, 'utf8')).active.CALCOM_EVENT_TYPE_ID : undefined;
 writeFileSync(new URL('../README.local.md', import.meta.url), localReadme({ url, eventTypeId }));
-console.log(`README.local.md written for ${url}`);
+console.log(`\nREADME.local.md written for ${url}: the next commands, with this address.`);
 
 try {
   const res = await fetch(`${url}/health`);
