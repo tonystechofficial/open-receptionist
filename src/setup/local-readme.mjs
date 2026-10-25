@@ -18,7 +18,7 @@ export function localReadme({ url, eventTypeId }) {
   const event = eventTypeId ? ` (\`${eventTypeId}\` now)` : '';
   return `# My deployment: the next commands
 
-Written by \`npm run readme:local\`, ignored by git (\`*.local.md\`). Worker: **${url}**
+Written by \`npm run deploy\` (or \`npm run readme:local\`), ignored by git (\`*.local.md\`). Worker: **${url}**
 
 Secrets stay out of this file: type them in the terminal where \`<...>\` says so.
 
