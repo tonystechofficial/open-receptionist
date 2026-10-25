@@ -11,9 +11,9 @@ const TOML = [
   '[vars]',
   'CLIENT_COMPANY = "Plomberie Dupont"',
   'CLIENT_TELEPHONE = "05 56 12 34 56"   # given to the caller in the confirmation SMS',
-  'NOTIFY_EMAIL = "contact@plomberie-dupont.fr"   # required',
+  'NOTIFY_EMAIL = "contact@plomberie-dupont.example"   # required',
   'NOTIFY_SMS = "06 12 34 56 78"         # optional',
-  '# ALERT_EMAIL = "you@your-domain.fr"  # who gets the daily report',
+  '# ALERT_EMAIL = "you@your-domain.example"  # who gets the daily report',
   '# RETENTION_DAYS = "365"              # 30 to 1825',
   'VAPI_ASSISTANT_ID = ""',
   '',
@@ -24,9 +24,9 @@ const TOML = [
 
 // The template's example values: contacts and ids that must not stay in a real deployment.
 const EXAMPLES = {
-  CLIENT_COMPANY: 'Plomberie Dupont', CLIENT_TELEPHONE: '05 56 12 34 56', NOTIFY_EMAIL: 'contact@plomberie-dupont.fr',
-  NOTIFY_SMS: '06 12 34 56 78', ALERT_EMAIL: 'you@your-domain.fr', CALCOM_EVENT_TYPE_ID: '123456',
-  MAIL_FROM: 'Accueil <accueil@your-domain.fr>', CLIENT_TARIFS_URL: 'https://plomberie-dupont.fr/tarifs',
+  CLIENT_COMPANY: 'Plomberie Dupont', CLIENT_TELEPHONE: '05 56 12 34 56', NOTIFY_EMAIL: 'contact@plomberie-dupont.example',
+  NOTIFY_SMS: '06 12 34 56 78', ALERT_EMAIL: 'you@your-domain.example', CALCOM_EVENT_TYPE_ID: '123456',
+  MAIL_FROM: 'Accueil <accueil@your-domain.example>', CLIENT_TARIFS_URL: 'https://plomberie-dupont.example/tarifs',
 };
 // A complete, valid set of answers; each test changes one of them.
 const GOOD = {
@@ -40,10 +40,10 @@ const check = (key, value, more = {}) => checkAnswer(key, value, { ...GOOD, ...m
 test('the [vars] values are read, set and commented out, and nothing from the other sections', () => {
   const { active, commented } = readVars(TOML);
   assert.deepEqual(active, {
-    CLIENT_COMPANY: 'Plomberie Dupont', CLIENT_TELEPHONE: '05 56 12 34 56', NOTIFY_EMAIL: 'contact@plomberie-dupont.fr',
+    CLIENT_COMPANY: 'Plomberie Dupont', CLIENT_TELEPHONE: '05 56 12 34 56', NOTIFY_EMAIL: 'contact@plomberie-dupont.example',
     NOTIFY_SMS: '06 12 34 56 78', VAPI_ASSISTANT_ID: '',
   });
-  assert.deepEqual(commented, { ALERT_EMAIL: 'you@your-domain.fr', RETENTION_DAYS: '365' });
+  assert.deepEqual(commented, { ALERT_EMAIL: 'you@your-domain.example', RETENTION_DAYS: '365' });
 });
 
 test('an answer replaces the value and keeps its comment; every other line stays as it was', () => {

@@ -50,13 +50,13 @@ A new client is a new config, not new code. See `config/client.example.json`:
   "metier": "plomberie",
   "telephone": "05 56 12 34 56",
   "calendar": { "provider": "calcom", "id": "123456" },
-  "notify": { "email": ["contact@plomberie-dupont.fr"], "sms": ["33612345678"] },
+  "notify": { "email": ["contact@plomberie-dupont.example"], "sms": ["33612345678"] },
   "smsSender": "Dupont",
   "infos": {
     "prestations": ["recherche et réparation de fuite", "débouchage", "..."],
     "zone": ["Bordeaux", "Mérignac", "Pessac", "..."],
     "tarifs": { "deplacement": "49 € TTC, offert si les travaux sont réalisés", "devis": "gratuit, remis avant les travaux" },
-    "tarifsUrl": "https://plomberie-dupont.fr/tarifs"
+    "tarifsUrl": "https://plomberie-dupont.example/tarifs"
   },
   "urgences": "Odeur de gaz : ... le 05 56 79 41 00 de Régaz-Bordeaux ..., sinon Urgence Sécurité Gaz au 0 800 47 33 33 ..."
 }

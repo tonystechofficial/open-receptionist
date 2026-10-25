@@ -22,7 +22,7 @@ const base = {
   company: 'Plomberie Dupont',
   metier: 'plomberie',
   calendar: { provider: 'calcom', id: 'plomberie-dupont' },
-  notify: { email: ['contact@plomberie-dupont.fr'] },
+  notify: { email: ['contact@plomberie-dupont.example'] },
 };
 
 test('rejects a config without a company', () => {
@@ -187,7 +187,7 @@ test('the business information is kept as written, the area normalised to a list
     tarifs: { deplacement: '49 € TTC', tauxHoraire: '65 € TTC de l\'heure', forfaits: ['Débouchage évier : 89 € TTC'], devis: 'gratuit' },
     paiement: ['carte bancaire', 'chèque'],
     faq: [{ question: 'Intervenez-vous le week-end ?', reponse: 'Oui, le samedi matin.' }],
-    tarifsUrl: 'https://plomberie-dupont.fr/tarifs',
+    tarifsUrl: 'https://plomberie-dupont.example/tarifs',
   };
   const r = validateClientConfig({ ...base, infos });
   assert.equal(r.ok, true, r.errors.join('; '));
@@ -196,7 +196,7 @@ test('the business information is kept as written, the area normalised to a list
 });
 
 test('business information that could mislead a caller is refused', () => {
-  const bad = validateClientConfig({ ...base, infos: { tarifsUrl: 'http://plomberie-dupont.fr/tarifs', zone: 'Bordeaux', faq: [{ question: 'Prix ?' }] } });
+  const bad = validateClientConfig({ ...base, infos: { tarifsUrl: 'http://plomberie-dupont.example/tarifs', zone: 'Bordeaux', faq: [{ question: 'Prix ?' }] } });
   assert.equal(bad.ok, false);
   for (const field of ['tarifsUrl', 'zone', 'faq']) {
     assert.ok(bad.errors.some((e) => e.includes(field)), `${field}: ${bad.errors.join('; ')}`);

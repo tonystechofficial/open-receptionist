@@ -346,9 +346,9 @@ test('Twilio: the first call refused by the hourly total emails the operator rig
 });
 
 test('the Worker reads the service area and the rates page from its settings', () => {
-  const deps = buildDeps({ ...ENV, CLIENT_ZONE: 'Bordeaux, Mérignac', CLIENT_TARIFS_URL: 'https://plomberie-dupont.fr/tarifs' }, () => memoryStore());
+  const deps = buildDeps({ ...ENV, CLIENT_ZONE: 'Bordeaux, Mérignac', CLIENT_TARIFS_URL: 'https://plomberie-dupont.example/tarifs' }, () => memoryStore());
   assert.deepEqual(deps.config.infos.zone, ['Bordeaux', 'Mérignac']);
-  assert.equal(deps.config.infos.tarifsUrl, 'https://plomberie-dupont.fr/tarifs');
+  assert.equal(deps.config.infos.tarifsUrl, 'https://plomberie-dupont.example/tarifs');
 });
 
 test('the daily check reports transfer hours it cannot read, while the calls go on', async () => {

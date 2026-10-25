@@ -62,8 +62,8 @@ test('ownerRecap states the booked slot for a normal call', () => {
 });
 
 test('with a published rates page, the confirmation carries its link, still in the SMS alphabet', () => {
-  const s = confirmationSms({ company: 'Plomberie Dupont', label: 'vendredi 23 octobre à 9 h 30', contactPhone: '+33556123456', tarifsUrl: 'https://plomberie-dupont.fr/tarifs' });
-  assert.ok(s.includes('Tarifs : https://plomberie-dupont.fr/tarifs'), s);
+  const s = confirmationSms({ company: 'Plomberie Dupont', label: 'vendredi 23 octobre à 9 h 30', contactPhone: '+33556123456', tarifsUrl: 'https://plomberie-dupont.example/tarifs' });
+  assert.ok(s.includes('Tarifs : https://plomberie-dupont.example/tarifs'), s);
   assert.match(s, GSM7);
 });
 

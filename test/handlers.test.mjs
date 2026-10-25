@@ -329,7 +329,7 @@ test('without an email provider the recap email is recorded as failed, not skipp
 });
 
 // Business information (2026-10-24): the service area is enforced by the webhook, not left to the prompt.
-const AREA = { infos: { zone: ['Bordeaux', 'Mérignac'], tarifsUrl: 'https://plomberie-dupont.fr/tarifs' } };
+const AREA = { infos: { zone: ['Bordeaux', 'Mérignac'], tarifsUrl: 'https://plomberie-dupont.example/tarifs' } };
 
 test('a request from a town outside the area is noted, and the agent is told to say so', async () => {
   const { deps } = setup({ config: AREA });
@@ -371,7 +371,7 @@ test('a booking in the area carries the address to the calendar and the rates li
   await H.handleToolCall(tool('prendre_rdv', { creneau: '2026-10-23T07:30:00Z' }, { id: 't2' }), deps);
   assert.equal(cal.booked.length, 1);
   assert.match(cal.booked[0].notes, /12 rue des Lilas, Mérignac/);
-  assert.ok(callerSms(sent)[0].content.includes('https://plomberie-dupont.fr/tarifs'));
+  assert.ok(callerSms(sent)[0].content.includes('https://plomberie-dupont.example/tarifs'));
   await H.handleCallReport(endOfCall(), deps);
   assert.match(sent.email[0].text, /Adresse : 12 rue des Lilas, Mérignac/);
 });
