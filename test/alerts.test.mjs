@@ -40,6 +40,15 @@ test('sent and skipped deliveries are not problems', () => {
   assert.deepEqual(problems, []);
 });
 
+test('a call the CRM refused is reported', () => {
+  const problems = deliveryProblems([{
+    callId: 'call_4', caller, endedAt: AT, recapSentAt: AT,
+    deliveries: { recap: { email: { status: 'sent', at: AT }, sms: [] }, crm: { status: 'failed', reason: 'CRM 401: unauthorized', at: AT } },
+  }]);
+  assert.equal(problems.length, 1, problems.join('\n'));
+  assert.match(problems[0], /Jean Dupont \(call_4\) : appel non transmis au CRM \(CRM 401: unauthorized\)/);
+});
+
 test('a call that ended without any recap attempt is reported', () => {
   const problems = deliveryProblems([{ callId: 'call_3', caller: null, endedAt: AT, recapSentAt: null, deliveries: null }]);
   assert.equal(problems.length, 1);

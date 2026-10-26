@@ -36,6 +36,7 @@ SMS_SENDER = "Dupont"                 # the business's short name, 3 to 11 lette
 # ALERT_EMAIL = "you@your-domain.example"  # who gets the daily report and the flood alert; defaults to the first NOTIFY_EMAIL
 # SMS_COUNTRIES = "33"                # dialling codes that may receive an SMS (France only by default)
 # RETENTION_DAYS = "365"              # records older than this are deleted every morning (30 to 1825)
+# CRM_WEBHOOK_URL = ""                # where the end of each call goes (open-pipeline: npm run link:receptionist), with the secret CRM_WEBHOOK_SECRET
 
 # Call screening (docs/SETUP.md, step 5.4). Calls let through are counted per number, for withheld
 # numbers and in total; beyond the limits, the caller is turned away before Vapi answers.

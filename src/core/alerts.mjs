@@ -21,6 +21,7 @@ export function deliveryProblems(calls = []) {
     for (const s of d.recap?.sms ?? []) {
       if (s.status === 'failed') problems.push(`${label} : récapitulatif par SMS non envoyé au ${formatPhoneFr(s.to)} (${s.reason})`);
     }
+    if (d.crm?.status === 'failed') problems.push(`${label} : appel non transmis au CRM (${d.crm.reason})`);
     if (call.endedAt && !call.recapSentAt && !d.recap) problems.push(`${label} : appel terminé sans récapitulatif`);
   }
   return problems;

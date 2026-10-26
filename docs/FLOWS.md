@@ -115,6 +115,12 @@ Sent once per call: `recap_sent_at` is set once the recap reached at least one r
 redelivered end-of-call report into a no-op. A recap that reached nobody leaves it unset, so a
 redelivered report tries again. Each channel's result is kept in `deliveries`.
 
+With `CRM_WEBHOOK_URL` set, the end of the call also goes to a CRM, such as
+[open-pipeline](https://github.com/tonystechofficial/open-pipeline): the caller's name, phone, email,
+need, urgency and town, the appointment or « à rappeler », and the summary, never the street address.
+The request carries `CRM_WEBHOOK_SECRET` in `x-pipeline-secret`. The result is kept in
+`deliveries.crm`, so a refused forward shows in the daily check; the recap goes out either way.
+
 ## 12. The daily check
 
 Every morning a cron trigger runs the check, and `GET /api/check` (with the webhook secret) runs it on

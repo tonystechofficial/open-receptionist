@@ -248,6 +248,39 @@ test('a call with no tool use is still recapped from the caller ID and the call 
   assert.match(sent.email[0].text, /Résumé : Demande de devis/);
 });
 
+test('with a CRM set, the end of the call is forwarded once and recorded with the other deliveries', async () => {
+  const { deps } = setup();
+  const forwarded = [];
+  deps.crm = async (payload) => { forwarded.push(payload); };
+  await H.handleToolCall(tool('prendre_rdv', { creneau: '2026-10-23T07:30:00Z', nom: 'Jean Dupont', besoin: 'devis' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  await H.handleCallReport(endOfCall(), deps); // redelivered by Vapi
+  assert.equal(forwarded.length, 1);
+  assert.equal(forwarded[0].callId, 'call_1');
+  assert.equal(forwarded[0].status, 'rdv');
+  assert.equal(forwarded[0].appointment.label, 'vendredi 23 octobre à 9 h 30');
+  assert.equal(forwarded[0].caller.nom, 'Jean Dupont');
+  assert.equal((await deps.store.getCall('call_1')).deliveries.crm.status, 'sent');
+});
+
+test('a CRM that refuses the call leaves a failed delivery for the daily check; the recap still goes', async () => {
+  const { sent, deps } = setup();
+  deps.crm = async () => { throw new Error('CRM 401: unauthorized'); };
+  await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'devis' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  assert.equal(sent.email.length, 1);
+  const { crm } = (await deps.store.getCall('call_1')).deliveries;
+  assert.equal(crm.status, 'failed');
+  assert.equal(crm.reason, 'CRM 401: unauthorized');
+});
+
+test('without a CRM, nothing is forwarded and the deliveries have no CRM entry', async () => {
+  const { deps } = setup();
+  await H.handleToolCall(tool('noter_demande', { nom: 'Jean Dupont', besoin: 'devis' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  assert.equal('crm' in (await deps.store.getCall('call_1')).deliveries, false);
+});
+
 test('handleVapiMessage routes each Vapi message type', async () => {
   const { deps } = setup();
   const tools = await H.handleVapiMessage(tool('verifier_dispos', {}), deps);

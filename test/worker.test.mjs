@@ -351,6 +351,12 @@ test('the Worker reads the service area and the rates page from its settings', (
   assert.equal(deps.config.infos.tarifsUrl, 'https://plomberie-dupont.example/tarifs');
 });
 
+test('a CRM address without its secret fails each forward, so the daily check says what is missing', async () => {
+  assert.equal(buildDeps(ENV, () => memoryStore()).crm, undefined);
+  const deps = buildDeps({ ...ENV, CRM_WEBHOOK_URL: 'https://open-pipeline-intake.tony.workers.dev/intake/receptionist' }, () => memoryStore());
+  await assert.rejects(deps.crm({ callId: 'call_1' }), /CRM_WEBHOOK_SECRET/);
+});
+
 test('the daily check reports transfer hours it cannot read, while the calls go on', async () => {
   await withFakeApis({}, async (mails) => {
     await runScheduled(createWorker({ makeStore: () => memoryStore() }), { ...CHECK_ENV, TRANSFER_HOURS: 'tous les jours' });

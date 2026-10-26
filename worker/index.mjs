@@ -13,6 +13,7 @@ import { safeEqual } from '../src/server/secrets.mjs';
 import { calcom } from '../src/providers/calendar/calcom.mjs';
 import { resend } from '../src/providers/notify/resend.mjs';
 import { smsProvider } from '../src/providers/notify/sms.mjs';
+import { crmFromEnv } from '../src/providers/crm/webhook.mjs';
 import { verifyTwilioSignature, twimlForward, twimlReject, twimlSayAndHangUp } from '../src/providers/telephony/twilio-voice.mjs';
 import { d1Store } from '../src/db/d1.mjs';
 
@@ -88,7 +89,7 @@ export function buildDeps(env, makeStore = (e) => d1Store(e.DB)) {
     limits: screeningLimits(env),
   };
   const alert = operatorMailer(env) ?? undefined; // the immediate flood alert
-  return { calendar, notify, store: makeStore(env), config, warnings, screening, alert };
+  return { calendar, notify, store: makeStore(env), config, warnings, screening, alert, crm: crmFromEnv(env) };
 }
 
 /** Sends a message to the operator: ALERT_EMAIL, or else the first NOTIFY_EMAIL. Null without email. */

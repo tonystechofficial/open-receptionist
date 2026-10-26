@@ -9,6 +9,7 @@ import { calcom } from '../providers/calendar/calcom.mjs';
 import { google } from '../providers/calendar/google.mjs';
 import { resend } from '../providers/notify/resend.mjs';
 import { smsProvider } from '../providers/notify/sms.mjs';
+import { crmFromEnv } from '../providers/crm/webhook.mjs';
 import { jsonFileStore, memoryStore } from '../db/store.mjs';
 
 let cached;
@@ -41,7 +42,7 @@ export async function buildDeps() {
   // Call screening, method 2 (assistant-request); the Twilio entry of method 1 lives in the Worker only.
   const screening = { assistantId: env.VAPI_ASSISTANT_ID || undefined, blocked: blockedNumbers(env.BLOCKED_NUMBERS), limits: screeningLimits(env) };
 
-  cached = { calendar, notify, store, config, screening };
+  cached = { calendar, notify, store, config, screening, crm: crmFromEnv(env) };
   return cached;
 }
 

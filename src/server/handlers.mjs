@@ -8,6 +8,7 @@ import { confirmationSms, ownerRecap, jobPlace } from '../core/messages.mjs';
 import { normalizePhone, smsRefusal } from '../core/phone.mjs';
 import { inZone } from '../core/zone.mjs';
 import { transferDecision } from '../core/transfer.mjs';
+import { crmPayload } from '../core/crm.mjs';
 import { screenIncoming, recordUnroutable } from './screening.mjs';
 import * as vapi from '../providers/voice/vapi.mjs';
 
@@ -86,19 +87,21 @@ export async function handleCallReport(message, deps) {
   const caller = mergeCaller(fallback, existing?.caller ?? null); // what the tools captured wins
   const appointment = await store.findAppointmentByCallId(ctx.callId);
   const recap = ownerRecap({ company: ctx.company, caller, appointment, summary: analysis.summary });
+  const endedAt = message.endedAt ?? ctx.now.toISOString();
 
   await store.upsertCall(ctx.callId, {
     caller,
     summary: analysis.summary,
     status: appointment ? 'rdv' : 'a_rappeler',
     urgent: recap.urgent,
-    endedAt: message.endedAt ?? ctx.now.toISOString(),
+    endedAt,
     endedReason: message.endedReason ?? null,
   });
   const sent = await sendOwnerRecap(recap, ctx);
+  const crm = await forwardToCrm(crmPayload({ callId: ctx.callId, endedAt, caller, appointment, summary: analysis.summary }), ctx);
   const reached = sent.email.status === 'sent' || sent.sms.some((s) => s.status === 'sent');
   await store.upsertCall(ctx.callId, {
-    deliveries: { ...(existing?.deliveries ?? {}), recap: sent },
+    deliveries: { ...(existing?.deliveries ?? {}), recap: sent, ...(crm ? { crm } : {}) },
     ...(reached ? { recapSentAt: ctx.now.toISOString() } : {}),
   });
   return { ok: true, callId: ctx.callId, recapSent: reached };
@@ -353,6 +356,19 @@ async function sendOwnerRecap(recap, ctx) {
     }
   }
   return sent;
+}
+
+/** The end of the call to the CRM (CRM_WEBHOOK_URL), when one is set; null otherwise. */
+async function forwardToCrm(payload, ctx) {
+  if (!ctx.deps.crm) return null;
+  const at = ctx.now.toISOString();
+  try {
+    await ctx.deps.crm(payload);
+    return { status: 'sent', at };
+  } catch (error) {
+    ctx.log('crm forward failed', error);
+    return { status: 'failed', reason: reasonOf(error), at };
+  }
 }
 
 function reasonOf(error) {
