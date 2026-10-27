@@ -5,6 +5,8 @@
 //
 //   npm run cal:setup
 //   Options: npm run cal:setup -- --title="Intervention" --minutes=60 --buffer=30 --notice=60
+//   With "parcours": "decouverte" in config/client.json, the event is a phone call to the caller:
+//   npm run cal:setup -- --title="Appel découverte" --minutes=20 --buffer=10 --notice=120
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { eventTypeBody, findEventType } from '../src/providers/calendar/calcom-setup.mjs';
@@ -53,7 +55,10 @@ if (!key) {
 }
 const flag = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
 const number = (name) => (flag(name) === undefined ? undefined : Number(flag(name)));
-const body = eventTypeBody({ title: flag('title'), minutes: number('minutes'), buffer: number('buffer'), notice: number('notice') });
+// The journey in config/client.json decides the place: the caller's address, or a phone call.
+const clientFile = new URL('../config/client.json', import.meta.url);
+const parcours = existsSync(clientFile) ? JSON.parse(readFileSync(clientFile, 'utf8')).parcours : undefined;
+const body = eventTypeBody({ title: flag('title'), minutes: number('minutes'), buffer: number('buffer'), notice: number('notice'), parcours });
 for (const [k, v] of Object.entries(body)) if (v === undefined) delete body[k];
 
 const BASE = 'https://api.cal.com/v2';

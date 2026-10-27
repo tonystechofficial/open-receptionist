@@ -42,3 +42,17 @@ test('an event type already there is found by its slug, so running it again crea
   assert.equal(findEventType(list, 'devis'), null);
   assert.equal(findEventType(undefined, 'intervention'), null);
 });
+
+// The discovery journey (2026-10-27): a first exchange by phone, the person calling the caller back.
+test('a discovery event is a phone call to the caller, and says so', () => {
+  const body = eventTypeBody({ title: 'Appel découverte', minutes: 20, buffer: 10, notice: 120, parcours: 'decouverte' });
+  // A fixed text again, not Cal.com's attendeePhone location: that one is an answer Cal.com may
+  // require from the caller at booking time, and the receptionist books through the API.
+  const [location] = body.locations;
+  assert.equal(location.type, 'address');
+  assert.match(location.address, /téléphone/);
+  assert.doesNotMatch(body.description, /adresse/);
+  assert.match(body.description, /téléphone/);
+  assert.equal(body.lengthInMinutes, 20);
+  assert.equal(body.slug, 'appel-decouverte');
+});

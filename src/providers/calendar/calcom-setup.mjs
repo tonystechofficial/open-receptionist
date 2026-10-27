@@ -11,15 +11,25 @@ const slugify = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowe
   .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /** One hour by default, 30 minutes for the road after, bookable from one hour ahead. */
-export function eventTypeBody({ title = 'Intervention', minutes = 60, buffer = 30, notice = 60 } = {}) {
+export function eventTypeBody({ title = 'Intervention', minutes = 60, buffer = 30, notice = 60, parcours = 'intervention' } = {}) {
+  // The discovery journey books a first exchange by phone: the person calls the caller back at the
+  // number the booking carries. The place stays a fixed text, as for a call-out: Cal.com's
+  // attendeePhone location is an answer it may require from the caller when the API books.
+  const discovery = parcours === 'decouverte';
   return {
     title,
     slug: slugify(title),
     lengthInMinutes: minutes,
     afterEventBuffer: buffer,
     minimumBookingNotice: notice,
-    description: "Pris par le réceptionniste vocal. Le besoin et l'adresse de l'intervention sont dans les notes.",
-    locations: [{ type: 'address', address: "Chez le client, adresse dans les notes", public: true }],
+    description: discovery
+      ? "Pris par le réceptionniste vocal : un premier échange par téléphone, au numéro de l'appelant. Son besoin et ses réponses sont dans les notes."
+      : "Pris par le réceptionniste vocal. Le besoin et l'adresse de l'intervention sont dans les notes.",
+    locations: [{
+      type: 'address',
+      address: discovery ? "Par téléphone, au numéro de l'appelant" : 'Chez le client, adresse dans les notes',
+      public: true,
+    }],
     bookingFields: [
       { field: 'email', slug: 'email', required: false, hidden: true },
       { field: 'attendeePhoneNumber', slug: 'attendeePhoneNumber', required: true, hidden: false },

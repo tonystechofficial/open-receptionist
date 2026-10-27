@@ -94,6 +94,10 @@ ahead, phone required and email optional), or keeps the one already there, and w
 `wrangler.toml` and `config/client.json`. Options: `-- --title="Visite de devis" --minutes=30
 --buffer=15 --notice=0`. The working hours stay to set in Cal.com (**Availability**).
 
+With `"parcours": "decouverte"` in `config/client.json` (step 4.2), the event is a phone call instead:
+its place reads « Par téléphone, au numéro de l'appelant ». For example:
+`npm run cal:setup -- --title="Appel découverte" --minutes=20 --buffer=10 --notice=120`.
+
 ### 1.3 Vapi
 
 1. Create the account and add a payment method: the trial credit runs out after a few test calls.
