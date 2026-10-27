@@ -3,6 +3,9 @@
 name = "open-receptionist"
 main = "worker/index.mjs"
 compatibility_date = "2026-09-01"
+# Lets the end-of-call forward reach a CRM Worker on the same Cloudflare account (open-pipeline on
+# workers.dev): without it, Cloudflare refuses a fetch between two Workers of one zone (error 1042).
+compatibility_flags = ["global_fetch_strictly_public"]
 workers_dev = true      # the Worker answers at https://open-receptionist.<your-subdomain>.workers.dev
 preview_urls = false    # no extra public address per version
 

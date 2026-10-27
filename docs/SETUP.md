@@ -226,7 +226,7 @@ a setting changes, then deploy. Editing the `[vars]` block by hand works too:
 | `ALERT_EMAIL` | who receives the daily check's alerts and the immediate flood alert, usually you. Defaults to the first `NOTIFY_EMAIL` |
 | `TRANSFER_HOURS` | optional: when an emergency or a caller asking for a person may be put through to `transfert.numero` (step 4.2), Paris time, such as `lun-ven 8h-18h; sam 9h-12h30`. Empty: any hour, night included |
 | `RETENTION_DAYS` | optional: how long call records are kept before the daily run deletes them. 365 by default, from 30 to 1825 |
-| `CRM_WEBHOOK_URL` | optional: where the end of each call is sent, with the secret `CRM_WEBHOOK_SECRET` (docs/FLOWS.md, section 11). open-pipeline's `npm run link:receptionist` sets both |
+| `CRM_WEBHOOK_URL` | optional: where the end of each call is sent, with the secret `CRM_WEBHOOK_SECRET` (docs/FLOWS.md, section 11). open-pipeline's `npm run link:receptionist` sets both. A CRM Worker on the same Cloudflare account also needs `compatibility_flags = ["global_fetch_strictly_public"]`, already in the template |
 
 To keep the Worker's logs after each call, also add:
 

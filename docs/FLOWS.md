@@ -120,6 +120,9 @@ With `CRM_WEBHOOK_URL` set, the end of the call also goes to a CRM, such as
 need, urgency and town, the appointment or « à rappeler », and the summary, never the street address.
 The request carries `CRM_WEBHOOK_SECRET` in `x-pipeline-secret`. The result is kept in
 `deliveries.crm`, so a refused forward shows in the daily check; the recap goes out either way.
+When the CRM is a Worker on the same Cloudflare account, the forward needs the
+`global_fetch_strictly_public` flag set in `wrangler.toml`; without it, Cloudflare refuses it with
+error 1042.
 
 ## 12. The daily check
 
