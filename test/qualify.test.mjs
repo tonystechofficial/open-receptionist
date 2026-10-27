@@ -74,3 +74,26 @@ test('the town and the address of the job are kept, and a later step fills what 
   assert.equal(merged.ville, 'Mérignac');
   assert.equal(merged.adresse, '12 rue des Lilas');
 });
+
+// Discovery answers (2026-10-27): what a service business needs to prepare the first exchange.
+test('the discovery answers are kept, trimmed, the missed calls as a number', () => {
+  const c = qualify({
+    nom: 'Pierre Berger', besoin: 'réceptionniste', telephone: '0612345678',
+    entreprise: ' Plomberie Berger ', activite: 'plombier', offre: 'receptionniste',
+    situation: 'les appels tombent sur la messagerie', appels_manques: '10', echeance: 'avant Noël',
+  });
+  assert.deepEqual(c.qualification, {
+    entreprise: 'Plomberie Berger', activite: 'plombier', offre: 'receptionniste',
+    situation: 'les appels tombent sur la messagerie', appels_manques: 10, echeance: 'avant Noël',
+  });
+});
+
+test('no discovery answer gives an empty qualification; a missed-calls count that is not a number is dropped', () => {
+  assert.deepEqual(qualify({ nom: 'A' }).qualification, {});
+  assert.deepEqual(qualify({ appels_manques: 'beaucoup' }).qualification, {});
+});
+
+test('mergeCaller keeps the discovery answers of every step', () => {
+  const merged = mergeCaller(qualify({ activite: 'plombier', echeance: 'janvier' }), qualify({ entreprise: 'Berger', echeance: '' }));
+  assert.deepEqual(merged.qualification, { entreprise: 'Berger', activite: 'plombier', echeance: 'janvier' });
+});

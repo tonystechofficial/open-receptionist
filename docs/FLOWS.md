@@ -114,7 +114,8 @@ when present, and the caller ID.
 ## 11. The owner recap
 
 The email is required and is the record of every call; the SMS is optional, on top. The email lists
-the name, need, urgency, phone, email, the appointment or « aucun, à rappeler », and Vapi's summary.
+the name, need, urgency, phone, email, the appointment or « aucun, à rappeler », the discovery answers
+when the call gave some (section 17), and Vapi's summary.
 The SMS is one line in the SMS alphabet.
 
 Sent once per call: `recap_sent_at` is set once the recap reached at least one recipient, and turns a
@@ -124,6 +125,8 @@ redelivered report tries again. Each channel's result is kept in `deliveries`.
 With `CRM_WEBHOOK_URL` set, the end of the call also goes to a CRM, such as
 [open-pipeline](https://github.com/tonystechofficial/open-pipeline): the caller's name, phone, email,
 need, urgency and town, the appointment or « à rappeler », and the summary, never the street address.
+The discovery answers go under `qualification`: `entreprise`, `activite`, `offre`, `situation`,
+`appels_manques` and `echeance`, only those the call gave; open-pipeline fills its deal fields with them.
 The request carries `CRM_WEBHOOK_SECRET` in `x-pipeline-secret`. The result is kept in
 `deliveries.crm`, so a refused forward shows in the daily check; the recap goes out either way.
 When the CRM is a Worker on the same Cloudflare account, the forward needs the
@@ -239,7 +242,9 @@ With `"parcours": "decouverte"` in `config/client.json`, the call books a first 
 2. It answers a question before asking its own.
 3. It asks three questions at most, one per turn, never read back: the caller's line of business,
    their situation for the offer they care about (`qualification`, one question per offer), and when
-   they would want it. A caller in a hurry goes straight to booking.
+   they would want it. A caller in a hurry goes straight to booking. `noter_demande` saves each answer
+   as it comes (`entreprise`, `activite`, `offre`, `situation`, `appels_manques`, `echeance`); they go
+   to the call record, the owner's recap and the CRM.
 4. It proposes the exchange (`echange.quoi`, and why: `echange.pourquoi`), then slots as in section 1;
    a time the caller names comes back alone when it is free (section 2).
 5. Before booking: the name and the company, the number confirmed by its last two digits when it is

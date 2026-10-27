@@ -3,7 +3,11 @@
 
 export function crmPayload({ callId, endedAt, caller = {}, appointment = null, summary = null }) {
   const c = caller ?? {};
+  // The discovery answers (entreprise, activite, offre, situation, appels_manques, echeance), named
+  // like open-pipeline's deal fields; absent when the call gave none.
+  const answers = c.qualification && Object.keys(c.qualification).length ? { qualification: { ...c.qualification } } : {};
   return {
+    ...answers,
     callId,
     endedAt,
     status: appointment ? 'rdv' : 'a_rappeler',

@@ -72,3 +72,14 @@ test('the owner recap gives the address and the town of the job', () => {
   assert.match(r.text, /Adresse : 12 rue des Lilas, Mérignac/);
   assert.match(r.sms, /Mérignac/);
 });
+
+test('the owner recap carries the discovery answers, when there are some', () => {
+  const r = ownerRecap({ company: 'X', caller: { nom: 'A', qualification: { entreprise: 'Berger', activite: 'plombier', situation: 'messagerie', appels_manques: 8, echeance: 'janvier' } } });
+  for (const s of ['Entreprise : Berger', 'Activité : plombier', 'Situation : messagerie', 'Appels manqués par semaine : 8', 'Échéance : janvier']) {
+    assert.ok(r.text.includes(s), s);
+  }
+});
+
+test('without discovery answers the recap is unchanged', () => {
+  assert.doesNotMatch(ownerRecap({ company: 'X', caller: { nom: 'A' } }).text, /Entreprise|Échéance/);
+});

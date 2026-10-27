@@ -175,3 +175,10 @@ test('the town and the address of the job are stored with the call and the appoi
   assert.equal((await store.getCall('c7')).caller.adresse, '12 rue des Lilas');
   assert.equal((await store.findAppointmentByCallId('c7')).caller.adresse, '12 rue des Lilas');
 });
+
+test('the discovery answers are stored with the call', { skip }, async () => {
+  const store = d1Store(await d1Binding());
+  await store.upsertCall('c9', { caller: { nom: '', besoin: '', urgence: 'normale', telephone: null, email: null, complet: false, qualification: { activite: 'plombier', appels_manques: 4 } } });
+  const c = await store.getCall('c9');
+  assert.deepEqual(c.caller.qualification, { activite: 'plombier', appels_manques: 4 });
+});

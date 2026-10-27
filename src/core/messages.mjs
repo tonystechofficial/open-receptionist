@@ -71,6 +71,16 @@ export function ownerRecap({ company, caller = {}, appointment = null, summary =
     `Email : ${c.email || 'non donné'}`,
     `Rendez-vous : ${rdv || 'aucun, à rappeler'}`,
   ];
+  const q = c.qualification ?? {};
+  const answers = [
+    q.entreprise && `Entreprise : ${q.entreprise}`,
+    q.activite && `Activité : ${q.activite}`,
+    q.offre && `Intérêt : ${q.offre}`,
+    q.situation && `Situation : ${q.situation}`,
+    q.appels_manques !== undefined && `Appels manqués par semaine : ${q.appels_manques}`,
+    q.echeance && `Échéance : ${q.echeance}`,
+  ].filter(Boolean);
+  lines.push(...answers);
   if (summary) lines.push(`Résumé : ${summary}`);
   const text = lines.join('\n');
   const html = `<p>${lines.map(escapeHtml).join('<br>')}</p><p style="color:#666">${escapeHtml(company ?? '')}</p>`;

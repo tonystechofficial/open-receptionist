@@ -69,20 +69,21 @@ export function d1Store(db) {
       const c = next.caller ?? {};
       await db
         .prepare(
-          `INSERT INTO calls (call_id, nom, besoin, urgence, telephone, email, ville, adresse, complet, status, urgent,
+          `INSERT INTO calls (call_id, nom, besoin, urgence, telephone, email, ville, adresse, qualification, complet, status, urgent,
              offered, summary, note, ended_at, ended_reason, recap_sent_at, deliveries, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(call_id) DO UPDATE SET
              nom = excluded.nom, besoin = excluded.besoin, urgence = excluded.urgence,
              telephone = excluded.telephone, email = excluded.email, ville = excluded.ville,
-             adresse = excluded.adresse, complet = excluded.complet,
+             adresse = excluded.adresse, qualification = excluded.qualification, complet = excluded.complet,
              status = excluded.status, urgent = excluded.urgent, offered = excluded.offered,
              summary = excluded.summary, note = excluded.note, ended_at = excluded.ended_at,
              ended_reason = excluded.ended_reason, recap_sent_at = excluded.recap_sent_at,
              deliveries = excluded.deliveries, updated_at = excluded.updated_at`,
         )
         .bind(
-          callId, v(c.nom), v(c.besoin), v(c.urgence), v(c.telephone), v(c.email), v(c.ville), v(c.adresse), c.complet ? 1 : 0,
+          callId, v(c.nom), v(c.besoin), v(c.urgence), v(c.telephone), v(c.email), v(c.ville), v(c.adresse),
+          c.qualification && Object.keys(c.qualification).length ? JSON.stringify(c.qualification) : null, c.complet ? 1 : 0,
           v(next.status), next.urgent ? 1 : 0, next.offered ? JSON.stringify(next.offered) : null,
           v(next.summary), v(next.note), v(next.endedAt), v(next.endedReason), v(next.recapSentAt),
           next.deliveries ? JSON.stringify(next.deliveries) : null, next.createdAt, now,
@@ -125,13 +126,14 @@ export function d1Store(db) {
 }
 
 function callFromRow(r) {
-  const hasCaller = [r.nom, r.besoin, r.telephone, r.email, r.ville, r.adresse].some((x) => x !== null && x !== undefined);
+  const hasCaller = [r.nom, r.besoin, r.telephone, r.email, r.ville, r.adresse, r.qualification].some((x) => x !== null && x !== undefined);
   return {
     callId: r.call_id,
     caller: hasCaller
       ? {
         nom: r.nom ?? '', besoin: r.besoin ?? '', urgence: r.urgence ?? 'normale', telephone: r.telephone, email: r.email,
         ville: r.ville ?? null, adresse: r.adresse ?? null, complet: !!r.complet,
+        qualification: r.qualification ? JSON.parse(r.qualification) : {},
       }
       : null,
     offered: r.offered ? JSON.parse(r.offered) : null,

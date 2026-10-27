@@ -221,3 +221,19 @@ test('the intervention journey keeps its greeting and its flow', () => {
   assert.match(a.firstMessage, /Que puis-je faire pour vous \?/);
   assert.match(a.model.messages[0].content, /fuite active/);
 });
+
+test('in the discovery journey, noter_demande takes the discovery answers, the offer being a configured id', () => {
+  const a = vapi.buildAssistant(discovery, {});
+  const note = functionTools(a).find((t) => t.function.name === 'noter_demande');
+  for (const k of ['entreprise', 'activite', 'offre', 'situation', 'appels_manques', 'echeance']) assert.ok(note.function.parameters.properties[k], k);
+  assert.deepEqual(note.function.parameters.properties.offre.enum, ['receptionniste', 'audit']);
+  assert.equal(note.function.parameters.properties.ville, undefined, 'no town of the job in this journey');
+  const book = functionTools(a).find((t) => t.function.name === 'prendre_rdv');
+  assert.ok(book.function.parameters.properties.entreprise);
+});
+
+test('the intervention journey keeps its tools as they were', () => {
+  const note = functionTools(vapi.buildAssistant(config, {})).find((t) => t.function.name === 'noter_demande');
+  assert.equal(note.function.parameters.properties.entreprise, undefined);
+  assert.ok(note.function.parameters.properties.ville);
+});

@@ -165,7 +165,7 @@ async function book(args, ctx) {
 
   const caller = mergeCaller(existing?.caller ?? null, qualify({
     nom: args.nom, besoin: args.besoin, urgence: args.urgence, telephone: args.telephone || ctx.callerNumber, email: args.email,
-    ville: args.ville, adresse: args.adresse,
+    ville: args.ville, adresse: args.adresse, entreprise: args.entreprise,
   }));
   if (!caller.complet) {
     await store.upsertCall(ctx.callId, { caller });
@@ -228,6 +228,9 @@ async function recordRequest(args, ctx) {
   const caller = mergeCaller(existing?.caller ?? null, qualify({
     nom: args.nom, besoin: args.besoin, urgence: args.urgence, telephone: args.telephone || ctx.callerNumber, email: args.email,
     ville: args.ville, adresse: args.adresse,
+    // The discovery journey's answers, saved as soon as the caller gives them.
+    entreprise: args.entreprise, activite: args.activite, offre: args.offre, situation: args.situation,
+    appels_manques: args.appels_manques, echeance: args.echeance,
   }));
   await ctx.deps.store.upsertCall(ctx.callId, { caller });
   const served = inZone(caller.ville, ctx.config.infos?.zone);

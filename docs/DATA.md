@@ -18,10 +18,11 @@ there, during the call. That never depends on the platform's own data features.
 
 ## What our database keeps
 
-Three tables, created by `migrations/0001_init.sql` in Cloudflare D1:
+Three tables, created by `migrations/0001_init.sql` in Cloudflare D1 (`0002_qualification.sql` adds one column):
 
 - **`calls`**, one row per call, keyed by the platform's call id: name, need, urgency, phone
-  (international form), email, the town and address of the job, whether the details are complete, the status (`rdv` or
+  (international form), email, the town and address of the job, the discovery answers (`qualification`, section 17 of
+  FLOWS.md), whether the details are complete, the status (`rdv` or
   `a_rappeler`), the urgent flag, the two slots offered as options 1 and 2, the platform's summary,
   a note when the calendar failed, `recap_sent_at`, and `deliveries`: what was sent to whom after
   the call (the caller's confirmation SMS, the owner's recap by email and by SMS), each marked sent,

@@ -302,24 +302,43 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
   const callBack = { type: 'string', description: "Seulement si l'appelant donne un autre numéro que celui de l'appel." };
   const ville = { type: 'string', description: "La ville de l'intervention, telle que l'appelant la dit." };
   const adresse = { type: 'string', description: "L'adresse de l'intervention : numéro et rue." };
+  // The trades journey places a job (urgency, town, address). The discovery journey learns about the
+  // caller's business instead, in the fields open-pipeline's deals use.
+  const discovery = c.parcours === 'decouverte';
+  const offers = (c.qualification ?? []).map((q) => q.offre);
+  const entreprise = { type: 'string', description: 'Le nom de son entreprise.' };
+  const job = discovery ? {} : { ville, adresse };
+  const urgency = discovery ? {} : { urgence: URGENCE };
+  const answers = discovery
+    ? {
+      entreprise,
+      activite: { type: 'string', description: 'Son activité, en quelques mots : plombier, cabinet de kinésithérapie…' },
+      offre: { type: 'string', ...(offers.length ? { enum: offers } : {}), description: "Ce qui l'intéresse." },
+      situation: { type: 'string', description: "Sa situation aujourd'hui, en une phrase, avec ses mots." },
+      appels_manques: { type: 'number', description: "Combien d'appels il manque par semaine, seulement s'il l'a dit." },
+      echeance: { type: 'string', description: "Pour quand il le voudrait, tel qu'il le dit." },
+    }
+    : {};
   const tools = [
-    fn('noter_demande', "Enregistre la demande de l'appelant pour le rappel et le récapitulatif. Appelle-le dès que tu connais le besoin et l'urgence, puis de nouveau si tu apprends le nom, la ville, l'adresse ou un autre moyen de rappel.", {
+    fn('noter_demande', discovery
+      ? "Enregistre la demande et les réponses de l'appelant pour le récapitulatif. Appelle-le dès que tu connais le besoin, puis après chaque nouvelle réponse."
+      : "Enregistre la demande de l'appelant pour le rappel et le récapitulatif. Appelle-le dès que tu connais le besoin et l'urgence, puis de nouveau si tu apprends le nom, la ville, l'adresse ou un autre moyen de rappel.", {
       type: 'object',
       properties: {
         nom: { type: 'string' },
         besoin: { type: 'string', description: 'Le besoin, en quelques mots.' },
-        urgence: URGENCE,
+        ...urgency,
         telephone: callBack,
         email: { type: 'string' },
-        ville,
-        adresse,
+        ...job,
+        ...answers,
       },
     }),
-    fn('verifier_dispos', "Renvoie au plus deux créneaux à proposer, déjà choisis selon l'urgence et rédigés pour être lus tels quels.", {
+    fn('verifier_dispos', `Renvoie au plus deux créneaux à proposer, ${discovery ? '' : "déjà choisis selon l'urgence et "}rédigés pour être lus tels quels ; un seul, à confirmer, quand l'heure précise demandée est libre.`, {
       type: 'object',
       properties: {
-        ville,
-        urgence: URGENCE,
+        ...(discovery ? {} : { ville }),
+        ...urgency,
         jour: { type: 'string', description: "Jour souhaité, tel que l'appelant le dit : aujourd'hui, demain, lundi, ou une date AAAA-MM-JJ." },
         moment: { type: 'string', enum: ['matin', 'après-midi', 'soir'], description: 'Moment de la journée souhaité.' },
         heure: { type: 'string', description: "Heure précise souhaitée, seulement si l'appelant en donne une, au format HH:MM : 12:00 pour midi, 14:30." },
@@ -333,11 +352,10 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
         creneau: { type: 'string', description: "Le numéro de l'option choisie, 1 ou 2, tel que donné par verifier_dispos." },
         nom: { type: 'string' },
         besoin: { type: 'string' },
-        urgence: URGENCE,
+        ...(discovery ? { entreprise } : urgency),
         telephone: callBack,
         email: { type: 'string' },
-        ville,
-        adresse,
+        ...job,
       },
     }),
     ...transferTools(c, fn),

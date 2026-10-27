@@ -45,3 +45,12 @@ test('the webhook gets the payload with the shared secret; a refusal throws with
   const refused = crmWebhook({ url: 'https://x.example', secret: 'wrong' }, async () => new Response('{"error":"unauthorized"}', { status: 401 }));
   await assert.rejects(refused({}), /CRM 401: \{"error":"unauthorized"\}/);
 });
+
+test('the discovery answers travel with the call, under qualification', () => {
+  const payload = crmPayload({ callId: 'c1', endedAt: AT, caller: { nom: 'A', qualification: { entreprise: 'Berger', appels_manques: 10 } } });
+  assert.deepEqual(payload.qualification, { entreprise: 'Berger', appels_manques: 10 });
+});
+
+test('a call without discovery answers carries no qualification', () => {
+  assert.equal('qualification' in crmPayload({ callId: 'c1', endedAt: AT, caller: { nom: 'A', qualification: {} } }), false);
+});

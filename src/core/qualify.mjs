@@ -25,8 +25,26 @@ function normEmail(e) {
   return t.includes('@') && t.lastIndexOf('.') > t.indexOf('@') ? t : null;
 }
 
+// What the discovery journey learns about the caller's business, as the CRM names it (open-pipeline's
+// deal fields). Only the answers given are kept; the missed calls are a count or nothing.
+const ANSWERS = ['entreprise', 'activite', 'offre', 'situation', 'echeance'];
+
+function answers(raw) {
+  const out = {};
+  for (const k of ANSWERS) {
+    const t = String(raw[k] ?? '').trim();
+    if (t) out[k] = t;
+  }
+  const missed = Number(String(raw.appels_manques ?? '').trim());
+  if (raw.appels_manques !== undefined && raw.appels_manques !== '' && Number.isInteger(missed) && missed >= 0) {
+    out.appels_manques = missed;
+  }
+  return out;
+}
+
 /**
- * @param {{nom?:string, besoin?:string, urgence?:string, telephone?:string, email?:string, ville?:string, adresse?:string}} raw
+ * @param {{nom?:string, besoin?:string, urgence?:string, telephone?:string, email?:string, ville?:string, adresse?:string,
+ *   entreprise?:string, activite?:string, offre?:string, situation?:string, appels_manques?:number|string, echeance?:string}} raw
  * @returns {{nom:string, besoin:string, urgence:'immediate'|'haute'|'normale', telephone:string|null, email:string|null, ville:string|null, adresse:string|null, complet:boolean, manquants:string[]}}
  */
 export function qualify(raw = {}) {
@@ -48,7 +66,7 @@ export function qualify(raw = {}) {
   if (!besoin) manquants.push('besoin');
   if (!telephone && !email) manquants.push('contact');
 
-  return { nom, besoin, urgence, telephone, email, ville, adresse, complet: manquants.length === 0, manquants };
+  return { nom, besoin, urgence, telephone, email, ville, adresse, qualification: answers(raw), complet: manquants.length === 0, manquants };
 }
 
 /**
@@ -63,5 +81,6 @@ export function mergeCaller(earlier, later) {
   return qualify({
     nom: pick('nom'), besoin: pick('besoin'), urgence, telephone: pick('telephone'), email: pick('email'),
     ville: pick('ville'), adresse: pick('adresse'),
+    ...earlier.qualification, ...later.qualification,
   });
 }

@@ -281,6 +281,18 @@ test('with a CRM set, the end of the call is forwarded once and recorded with th
   assert.equal((await deps.store.getCall('call_1')).deliveries.crm.status, 'sent');
 });
 
+test('the discovery answers noted during the call reach the CRM with the end of the call', async () => {
+  const { deps } = setup();
+  const forwarded = [];
+  deps.crm = async (payload) => { forwarded.push(payload); };
+  await H.handleToolCall(tool('noter_demande', { besoin: 'réceptionniste', activite: 'plombier', offre: 'receptionniste', appels_manques: 8 }), deps);
+  await H.handleToolCall(tool('noter_demande', { entreprise: 'Plomberie Berger', echeance: 'janvier' }, { id: 't2' }), deps);
+  await H.handleCallReport(endOfCall(), deps);
+  assert.deepEqual(forwarded[0].qualification, {
+    entreprise: 'Plomberie Berger', activite: 'plombier', offre: 'receptionniste', appels_manques: 8, echeance: 'janvier',
+  });
+});
+
 test('a CRM that refuses the call leaves a failed delivery for the daily check; the recap still goes', async () => {
   const { sent, deps } = setup();
   deps.crm = async () => { throw new Error('CRM 401: unauthorized'); };
