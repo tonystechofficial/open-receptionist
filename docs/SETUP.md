@@ -334,6 +334,11 @@ Fill it with the **same** company, trade, hours, phone and recipients as the `[v
 - `notify`, `smsSender` and `confirmation`, matching the Worker's settings. `notify.email` is required.
 - `transfert`, optional: `{ "numero": "06 …" }`, the phone that takes an emergency or a caller asking
   for a person, within `TRANSFER_HOURS` (step 3.3). Without it, no call is ever put through.
+- `parcours`, optional: `"intervention"` (the default: a job at the caller's) or `"decouverte"` (a
+  service business booking a first exchange). The discovery journey reads `interlocuteur`,
+  `presentation`, `echange`, `qualification`, `exemples` and `demonstration`: start from
+  `config/client.decouverte.example.json`, and leave `CLIENT_ZONE` empty. See
+  [FLOWS.md](FLOWS.md#17-the-discovery-journey-a-service-business-books-a-first-exchange).
 
 `config/client.json` is ignored by git, like `wrangler.toml`. The Worker reads `wrangler.toml` and the assistant script
 reads `config/client.json`, so change both whenever a setting changes.

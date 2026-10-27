@@ -151,3 +151,73 @@ test('with one, the agent asks the webhook first, then transfers, and comes back
   assert.match(briefing, /transferCancel/);
   assert.match(a.model.messages[0].content, /demander_transfert/);
 });
+
+// The discovery journey (2026-10-27): for a service business, the call books a first exchange.
+const { config: discovery } = validateClientConfig({
+  company: "Tony's Tech",
+  metier: 'développement web, mobile et IA',
+  calendar: { provider: 'calcom', id: '1' },
+  notify: { email: ['tony@example.fr'] },
+  parcours: 'decouverte',
+  interlocuteur: 'Tony',
+  presentation: 'une petite entreprise de Bordeaux qui crée des assistants IA',
+  echange: { quoi: 'un échange gratuit de vingt minutes avec Tony, par téléphone', pourquoi: "c'est ce qui lui permet de faire un devis" },
+  qualification: [
+    { offre: 'receptionniste', pour: 'le réceptionniste', situation: "« Aujourd'hui, quand vous ne pouvez pas décrocher, que se passe-t-il ? »" },
+    { offre: 'audit', pour: 'un audit', situation: "quel assistant, et s'il sert déjà" },
+  ],
+  exemples: [{ appelant: "C'est combien ?", reponse: 'Deux mille euros. Vous êtes dans quel domaine ?' }],
+  demonstration: true,
+  maxDurationSeconds: 600,
+  infos: { prestations: ['un réceptionniste vocal IA'], tarifs: { devis: 'gratuit' } },
+});
+const discoveryPrompt = (c = discovery) => vapi.buildAssistant(c, {}).model.messages[0].content;
+
+test('the discovery journey greets with what the agent can do, and who the call is with', () => {
+  const a = vapi.buildAssistant(discovery, {});
+  assert.match(a.firstMessage, /intelligence artificielle/);
+  assert.match(a.firstMessage, /renseigner/);
+  assert.match(a.firstMessage, /Tony/);
+  assert.match(a.firstMessage, /\?$/);
+});
+
+test('the discovery prompt qualifies the need with the configured questions, then books the exchange', () => {
+  const p = discoveryPrompt();
+  assert.ok(p.includes('une petite entreprise de Bordeaux qui crée des assistants IA'));
+  assert.ok(p.includes("pour le réceptionniste, « Aujourd'hui, quand vous ne pouvez pas décrocher, que se passe-t-il ? »"), p);
+  assert.ok(p.includes("pour un audit, quel assistant, et s'il sert déjà"));
+  assert.ok(p.includes('un échange gratuit de vingt minutes avec Tony, par téléphone'));
+  assert.ok(p.includes("c'est ce qui lui permet de faire un devis"));
+  assert.match(p, /trois questions au plus/);
+  assert.ok(p.includes("C'est combien ?") && p.includes('Deux mille euros. Vous êtes dans quel domaine ?'));
+  assert.ok(p.includes('un réceptionniste vocal IA'));
+});
+
+test('the discovery prompt leaves out the trades logic: no urgency scale, no town of the job', () => {
+  const p = discoveryPrompt();
+  assert.doesNotMatch(p, /fuite active/);
+  assert.doesNotMatch(p, /ville de l'intervention/);
+});
+
+test('the discovery prompt carries the rules the first real call showed were missing', () => {
+  const p = discoveryPrompt();
+  assert.ok(p.includes('{{customer.number}}'));
+  assert.ok(p.includes('{{"now" | date:'), 'the agent knows the local date and time');
+  assert.match(p, /Monsieur/);
+  assert.match(p, /« demain » dit entre minuit et six heures/i);
+  assert.match(p, /deux derniers chiffres/);
+  assert.match(p, /6 minutes/);
+  assert.match(p, /n'est pas là ou ne peut pas répondre/);
+});
+
+test('a business that sells assistants turns "are you a robot?" into a demonstration; others do not', () => {
+  assert.match(discoveryPrompt(), /démonstration/);
+  const { config: plain } = validateClientConfig({ ...discovery, demonstration: false });
+  assert.doesNotMatch(discoveryPrompt(plain), /démonstration/);
+});
+
+test('the intervention journey keeps its greeting and its flow', () => {
+  const a = vapi.buildAssistant(config, {});
+  assert.match(a.firstMessage, /Que puis-je faire pour vous \?/);
+  assert.match(a.model.messages[0].content, /fuite active/);
+});

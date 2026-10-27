@@ -1,0 +1,45 @@
+{
+  "company": "Atelier Numérique",
+  "metier": "création de sites et d'applications",
+  "parcours": "decouverte",
+  "interlocuteur": "Claire",
+  "presentation": "une agence de Bordeaux qui crée des sites internet et des applications pour les petites entreprises",
+  "echange": {
+    "quoi": "un échange gratuit de vingt minutes avec Claire, par téléphone",
+    "pourquoi": "c'est ce qui lui permet de faire un devis"
+  },
+  "qualification": [
+    { "offre": "site", "pour": "un site", "situation": "s'il a déjà un site, et ce qui ne lui convient pas" },
+    { "offre": "application", "pour": "une application", "situation": "le projet en deux mots, et qui s'en servira" },
+    { "offre": "maintenance", "pour": "la maintenance", "situation": "quel site, et ce qui pose problème aujourd'hui" }
+  ],
+  "exemples": [
+    { "appelant": "Bonjour, combien coûte un site vitrine ?", "reponse": "À partir de mille deux cents euros, selon le nombre de pages. Vous êtes dans quel domaine ?" },
+    { "appelant": "Je suis kinésithérapeute, à Pessac.", "reponse": "Et vous avez déjà un site, aujourd'hui ?" }
+  ],
+  "demonstration": false,
+  "horaires": "du lundi au vendredi, de 9 h à 18 h",
+  "telephone": "05 56 00 00 10",
+  "timeZone": "Europe/Paris",
+  "calendar": { "provider": "calcom", "id": "123456" },
+  "notify": {
+    "email": ["contact@atelier-numerique.example"],
+    "sms": ["33612345678"]
+  },
+  "smsSender": "Atelier",
+  "confirmation": { "sms": true },
+  "maxDurationSeconds": 600,
+  "silenceTimeoutSeconds": 30,
+  "recordingEnabled": false,
+  "infos": {
+    "prestations": ["des sites vitrines", "des boutiques en ligne", "des applications mobiles", "la maintenance de sites existants"],
+    "zone": [],
+    "tarifs": {
+      "forfaits": ["site vitrine : à partir de 1 200 euros", "maintenance : 49 euros par mois"],
+      "devis": "gratuit, après un premier échange de 20 minutes"
+    },
+    "faq": [
+      { "question": "Travaillez-vous à distance ?", "reponse": "Oui, partout en France, par téléphone et en visio." }
+    ]
+  }
+}

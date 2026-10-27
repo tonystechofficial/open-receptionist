@@ -226,6 +226,31 @@ A transferred minute is billed on both legs of the call. Only a real call proves
 the 5-minute cap applies after the caller is connected, and how long the number rings before Vapi
 gives up, are not documented.
 
+## 17. The discovery journey: a service business books a first exchange
+
+With `"parcours": "decouverte"` in `config/client.json`, the call books a first exchange with a person
+(`interlocuteur`) instead of a job at the caller's: an agency, a consultant, a studio. The default,
+`"intervention"`, is everything above. `config/client.decouverte.example.json` shows every setting.
+
+1. The agent says it is an AI and what it can do: « je peux vous renseigner ou vous réserver un échange
+   avec Claire ». It then finds out why the caller calls: a question or a project, an existing client,
+   someone who wants the person, a sales call (noted, never booked), or, with `demonstration`, someone
+   who just wants to try the assistant.
+2. It answers a question before asking its own.
+3. It asks three questions at most, one per turn, never read back: the caller's line of business,
+   their situation for the offer they care about (`qualification`, one question per offer), and when
+   they would want it. A caller in a hurry goes straight to booking.
+4. It proposes the exchange (`echange.quoi`, and why: `echange.pourquoi`), then slots as in section 1;
+   a time the caller names comes back alone when it is free (section 2).
+5. Before booking: the name and the company, the number confirmed by its last two digits when it is
+   the one calling, an email only if the caller offers one.
+6. It ends with the weekday, the date, the time, who calls whom, and the SMS.
+
+There is no urgency scale and no town of the job. Past 60% of `maxDurationSeconds`, the agent steers
+to booking rather than being cut off. It never guesses « Monsieur » or « Madame », never says the
+person is away, and checks « demain » said between midnight and six. The prompt gives the agent the
+local date and time.
+
 ## Planned, not built
 
 - The Google Calendar adapter (the slot exists in `src/providers/calendar/google.mjs`).

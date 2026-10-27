@@ -3,6 +3,7 @@ import { normalizePhone, canReceiveSms } from './phone.mjs';
 import { parseTransferHours } from './transfer.mjs';
 
 const DEFAULTS = {
+  parcours: 'intervention', // the trades flow; 'decouverte' books a first exchange for a service business
   language: 'fr',
   timeZone: 'Europe/Paris',
   recordingEnabled: false, // off by default; see docs/DATA.md
@@ -119,6 +120,30 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   if (infos.tarifsUrl !== undefined && !/^https:\/\/\S+$/.test(String(infos.tarifsUrl))) {
     errors.push('infos.tarifsUrl must be an https:// address');
   }
+
+  // The journey: 'intervention' (a job at the caller's, the default) or 'decouverte' (a first exchange
+  // with a service business). The discovery settings are read out to callers, so their shape is checked.
+  if (cfg.parcours !== undefined && !['intervention', 'decouverte'].includes(cfg.parcours)) {
+    errors.push('parcours must be "intervention" or "decouverte"');
+  }
+  for (const field of ['interlocuteur', 'presentation']) {
+    if (cfg[field] !== undefined && (typeof cfg[field] !== 'string' || !cfg[field].trim())) errors.push(`${field} must be a text`);
+  }
+  if (cfg.echange !== undefined) {
+    const e = cfg.echange;
+    if (typeof e !== 'object' || e === null || typeof e.quoi !== 'string' || !e.quoi.trim()) {
+      errors.push('echange.quoi must be a text, such as "un échange gratuit de vingt minutes avec Tony, par téléphone"');
+    } else if (e.pourquoi !== undefined && typeof e.pourquoi !== 'string') errors.push('echange.pourquoi must be a text');
+  }
+  const question = (q) => q && /^[a-z0-9_]+$/.test(q.offre ?? '') && typeof q.pour === 'string' && typeof q.situation === 'string';
+  if (cfg.qualification !== undefined && !(Array.isArray(cfg.qualification) && cfg.qualification.every(question))) {
+    errors.push('qualification must be a list of { offre, pour, situation }, offre being an id such as "receptionniste"');
+  }
+  const example = (x) => x && typeof x.appelant === 'string' && typeof x.reponse === 'string';
+  if (cfg.exemples !== undefined && !(Array.isArray(cfg.exemples) && cfg.exemples.every(example))) {
+    errors.push('exemples must be a list of { appelant, reponse } texts');
+  }
+  if (cfg.demonstration !== undefined && typeof cfg.demonstration !== 'boolean') errors.push('demonstration must be true or false');
 
   // Transfer to the business: a number the agent can dial, and hours the webhook can read. Unreadable
   // hours only warn: the webhook then refuses every transfer, and the calls go on.

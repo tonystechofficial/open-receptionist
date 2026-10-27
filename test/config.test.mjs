@@ -137,6 +137,15 @@ test('the example client config passes every rule, providers included', async ()
   assert.deepEqual(r.warnings, []);
 });
 
+test('the discovery example config passes every rule, providers included', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const example = JSON.parse(await readFile(new URL('../config/client.decouverte.example.json', import.meta.url), 'utf8'));
+  const r = validateClientConfig(example, { providers: { email: true, sms: true } });
+  assert.equal(r.ok, true, r.errors.join('; '));
+  assert.deepEqual(r.warnings, []);
+  assert.equal(r.config.parcours, 'decouverte');
+});
+
 test('without knowing the providers, no provider rule applies', () => {
   const r = validateClientConfig(base);
   assert.equal(r.ok, true, r.errors.join('; '));
@@ -219,4 +228,29 @@ test('unreadable transfer hours are a warning, not a refusal: the calls go on, w
   const out = validateClientConfig({ ...base, transfert: { horaires: 'tous les jours' } });
   assert.equal(out.ok, true);
   assert.ok(out.warnings.some((w) => w.startsWith('transfert.horaires') && /lun-ven 8h-18h/.test(w)), out.warnings.join('; '));
+});
+
+// The discovery journey (2026-10-27): a service business books a first call instead of a job.
+const LUNE = { company: 'Agence Lune', metier: 'conseil', calendar: { provider: 'calcom', id: '1' }, notify: { email: ['a@lune.fr'] } };
+
+test('the journey is intervention by default, and only intervention or decouverte', () => {
+  assert.equal(validateClientConfig(LUNE).config.parcours, 'intervention');
+  assert.equal(validateClientConfig({ ...LUNE, parcours: 'decouverte' }).ok, true);
+  const r = validateClientConfig({ ...LUNE, parcours: 'vente' });
+  assert.equal(r.ok, false);
+  assert.match(r.errors.join(' '), /parcours/);
+});
+
+test('the discovery settings are checked, since the agent reads them out', () => {
+  const r = validateClientConfig({
+    ...LUNE,
+    parcours: 'decouverte',
+    echange: { quoi: 42 },
+    qualification: [{ offre: 'Site Web', pour: 'un site', situation: 'le site actuel' }, { offre: 'audit' }],
+    exemples: [{ appelant: 'Bonjour' }],
+    demonstration: 'oui',
+  });
+  assert.equal(r.ok, false);
+  const all = r.errors.join(' | ');
+  for (const field of ['echange\.quoi', 'qualification', 'exemples', 'demonstration']) assert.match(all, new RegExp(field));
 });
