@@ -449,6 +449,13 @@ test('an emergency within the transfer hours is put through to the business', as
   assert.match(first(out).result, /Si personne ne répond/);
 });
 
+test('an allowed transfer is announced once, by the transfer tool', async () => {
+  const { deps } = setup({ config: TRANSFER });
+  const r = first(await H.handleToolCall(tool('demander_transfert', { motif: 'demande_appelant' }), deps)).result;
+  assert.doesNotMatch(r, /Dis à l'appelant que tu le mets en relation/);
+  assert.match(r, /sans rien annoncer/);
+});
+
 test('a caller asking for a person is put through too', async () => {
   const { deps } = setup({ config: TRANSFER });
   const out = await H.handleToolCall(tool('demander_transfert', { motif: 'demande_appelant' }), deps);

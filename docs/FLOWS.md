@@ -151,13 +151,28 @@ Every minute is billed, so three limits end a call that should end:
 
 - **The time cap.** Vapi cuts the call at `maxDurationSeconds`, 300 by default (the configuration
   check accepts 60 to 1,800). The agent knows the cap from its prompt.
-- **Silence.** Vapi hangs up after `silenceTimeoutSeconds` without speech, 30 by default (10 to 120).
+- **Silence.** After 8 seconds without speech the agent asks « Vous êtes toujours là ? » (or « Je vous
+  écoute »), twice at most; Vapi hangs up after `silenceTimeoutSeconds`, 30 by default (10 to 120).
 - **The agent hangs up.** Once the caller has no more questions, the agent calls Vapi's `endCall`
   tool, and `endCallMessage` says goodbye. It also hangs up on an abusive or prank call, or on an
   off-topic conversation that goes on after its answer, but never during an emergency.
 
 The end-of-call report records Vapi's reason (`exceeded-max-duration`, `silence-timed-out`,
 `assistant-ended-call`, `customer-ended-call`) in `ended_reason`, which the daily check reads.
+
+The rest of the call's pacing, set by `npm run vapi:setup`:
+
+- While `verifier_dispos` or `prendre_rdv` runs, the caller hears « Je regarde l'agenda », « Je
+  réserve ce créneau », and « Encore un petit instant » past three seconds. Set on the tools, these
+  replace the model's own fillers, one of which came out in *tu* on the first real call.
+- In the discovery journey, `noter_demande` runs without the agent waiting for it.
+- French acknowledgements (« oui », « d'accord », « hum ») never cut the agent off, and French
+  interruptions (« non », « attendez », « pardon ») stop it at once; Vapi's own lists are English.
+- Vapi's end-of-turn model is on (`smartEndpointing: false` turns it off): check on a real call that
+  it never cuts off a caller dictating a number.
+- The transcriber is told the business name, the person's name and `motsCles`.
+- `endCallMessage` is « Merci de votre appel, à bientôt. », right at any hour; `model` changes the
+  language model (`gpt-4o-mini` by default).
 
 ## 14. Screening a call before anything answers
 
@@ -219,7 +234,8 @@ transfer, and every request goes the call-back way.
    is told to note the request, urgent if it is, check the number, say the business calls back, and
    still offer the earliest slot for an emergency. Unreadable hours refuse every transfer and are
    reported by the daily check; the calls go on.
-3. **The transfer.** The agent says « Je vous mets en relation, ne quittez pas » and Vapi dials the
+3. **The transfer.** The transfer tool says « Je vous mets en relation, ne quittez pas »; the agent
+   announces nothing itself, or the caller would hear it twice. Vapi dials the
    number through Twilio, in warm-transfer mode: a second assistant tells whoever answers who is
    calling and why, then connects the caller, or cancels on voicemail or a refusal.
 4. **Nobody answers.** A busy or unanswered line brings the caller back: « Je n'ai pas réussi à joindre
@@ -259,7 +275,7 @@ local date and time.
 ## Planned, not built
 
 - The Google Calendar adapter (the slot exists in `src/providers/calendar/google.mjs`).
-- Naturalness tuning: an ElevenLabs French voice and Vapi's speaking-plan settings.
+- A faster, more natural French voice (Cartesia or ElevenLabs), to choose by ear and set in `voice`.
 
 Changing a booking by voice, an owner dashboard and several businesses in one deployment are left out
 on purpose: [SPEC.md](SPEC.md) gives the reasons.

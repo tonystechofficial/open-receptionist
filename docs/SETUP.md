@@ -339,6 +339,9 @@ Fill it with the **same** company, trade, hours, phone and recipients as the `[v
   `presentation`, `echange`, `qualification`, `exemples` and `demonstration`: start from
   `config/client.decouverte.example.json`, and leave `CLIENT_ZONE` empty. See
   [FLOWS.md](FLOWS.md#17-the-discovery-journey-a-service-business-books-a-first-exchange).
+- `motsCles`, `smartEndpointing` and `model`, optional: words the transcriber should catch on top of the
+  business name, `false` to turn off Vapi's end-of-turn model, and another OpenAI model than
+  `gpt-4o-mini`. See [FLOWS.md](FLOWS.md#13-a-long-silent-or-abusive-call).
 
 `config/client.json` is ignored by git, like `wrangler.toml`. The Worker reads `wrangler.toml` and the assistant script
 reads `config/client.json`, so change both whenever a setting changes.

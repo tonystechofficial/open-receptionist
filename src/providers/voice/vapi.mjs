@@ -63,6 +63,7 @@ function interventionPrompt(c) {
   const lines = [
     `Tu es l'assistant vocal de ${c.company}, une entreprise de ${c.metier}. Tu réponds au téléphone en français, au vouvoiement, avec des phrases courtes faites pour l'oral : une ou deux phrases à la fois, jamais de liste, jamais de symbole.`,
     `Tu es une intelligence artificielle et tu l'as dit en décrochant. Si on te demande si tu es humain, réponds honnêtement que non.`,
+    `Quand tu appelles verifier_dispos ou prendre_rdv, n'annonce pas d'attente toi-même : une phrase part toute seule.`,
     `Numéro de l'appelant, s'il est connu : {{customer.number}}. S'il est vide, masqué ou vaut "unknown", considère qu'il est inconnu.`,
     '',
     'DÉROULÉ',
@@ -77,7 +78,7 @@ function interventionPrompt(c) {
     `- Appel abusif, canular ou insultes, ou sujet sans rapport qui continue après ta réponse : dis poliment que tu ne peux pas aider, puis raccroche avec endCall.`,
     `- Ne raccroche jamais pendant une urgence, ni tant que l'appelant pose une question sur ${c.company}.`,
     ...(normalizePhone(c.transfert?.numero) ? [
-      `- Urgence immédiate, après les consignes de sécurité s'il y en a, ou appelant qui demande à parler à une personne : appelle demander_transfert avec le motif urgence ou demande_appelant et la demande en une phrase. Fais ce que l'outil répond : s'il autorise, annonce la mise en relation puis appelle transferCall. Si personne ne répond, appelle noter_demande, vérifie le numéro de rappel et dis que ${c.company} rappelle au plus vite.`,
+      `- Urgence immédiate, après les consignes de sécurité s'il y en a, ou appelant qui demande à parler à une personne : appelle demander_transfert avec le motif urgence ou demande_appelant et la demande en une phrase. Fais ce que l'outil répond : s'il autorise, appelle transferCall sans rien annoncer : le message de mise en relation part tout seul. Si personne ne répond, appelle noter_demande, vérifie le numéro de rappel et dis que ${c.company} rappelle au plus vite.`,
     ] : []),
   ];
   if (c.urgences) {
@@ -364,19 +365,56 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
     { type: 'endCall' },
   ];
 
+  // What the caller hears while a calendar tool runs. Set on the tool, it always plays, and the
+  // model's own fillers (one said « donne-moi un moment » on 27/10) are not needed. Several
+  // request-start messages are variants, so the agent does not repeat itself.
+  const agenda = c.interlocuteur ? `l'agenda de ${c.interlocuteur}` : "l'agenda";
+  const waits = {
+    verifier_dispos: [
+      { type: 'request-start', content: `Je regarde ${agenda}.` },
+      { type: 'request-start', content: 'Je vérifie les disponibilités.' },
+      { type: 'request-response-delayed', timingMilliseconds: 3000, content: 'Encore un petit instant.' },
+    ],
+    prendre_rdv: [{ type: 'request-start', content: 'Je réserve ce créneau.' }],
+  };
+  for (const t of tools) {
+    const name = t.function?.name;
+    if (waits[name]) t.messages = waits[name];
+    // In the discovery journey the agent needs nothing back from a note: no pause after each answer.
+    if (name === 'noter_demande' && discovery) t.async = true;
+  }
+
+  const french = (c.language ?? 'fr') === 'fr';
   return {
     name: `${c.company} - accueil`.slice(0, 40), // Vapi rejects names over 40 characters
     firstMessage: greeting(c),
     firstMessageMode: 'assistant-speaks-first',
     maxDurationSeconds: c.maxDurationSeconds ?? 300, // hard cap: the call is cut, whatever happens
     silenceTimeoutSeconds: c.silenceTimeoutSeconds ?? 30, // ends a call left open in silence
-    endCallMessage: 'Merci pour votre appel, je vous souhaite une bonne journée.',
+    // A silent caller is asked twice whether they are still there before the silence timeout ends it.
+    hooks: [{
+      on: 'customer.speech.timeout',
+      options: { timeoutSeconds: 8, triggerMaxCount: 2, triggerResetMode: 'onUserSpeech' },
+      do: [{ type: 'say', exact: ['Vous êtes toujours là ?', 'Je vous écoute.'] }],
+    }],
+    endCallMessage: 'Merci de votre appel, à bientôt.', // right at any hour
     artifactPlan: { recordingEnabled: !!c.recordingEnabled },
-    transcriber: { provider: 'deepgram', model: 'nova-3', language: c.language ?? 'fr' },
+    transcriber: {
+      provider: 'deepgram',
+      model: 'nova-3',
+      language: c.language ?? 'fr',
+      // The business name was transcribed « tennis tech » on 27/10: keyterm prompting boosts it.
+      keyterm: [...new Set([c.company, c.interlocuteur, ...(c.motsCles ?? [])].filter(Boolean))],
+    },
+    // Vapi's defaults are English words only: in French, « oui » or « d'accord » said while the agent
+    // talks would cut it off, and « attendez » would not stop it at once.
+    ...(french ? { stopSpeakingPlan: { numWords: 1, acknowledgementPhrases: ACKNOWLEDGEMENTS_FR, interruptionPhrases: INTERRUPTIONS_FR } } : {}),
+    // Vapi's own end-of-turn model, which it recommends for languages other than English.
+    ...(c.smartEndpointing === false ? {} : { startSpeakingPlan: { smartEndpointingPlan: { provider: 'vapi' } } }),
     voice: c.voice ?? { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' },
     model: {
       provider: 'openai',
-      model: 'gpt-4o-mini',
+      model: c.model || 'gpt-4o-mini',
       temperature: 0.3,
       messages: [{ role: 'system', content: systemPrompt(c) }],
       tools,
@@ -385,3 +423,6 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
     serverMessages: ['end-of-call-report'],
   };
 }
+
+const ACKNOWLEDGEMENTS_FR = ['oui', 'ouais', "d'accord", 'ok', 'okay', 'hm', 'hum', 'mh', 'je vois', 'très bien', 'voilà', "c'est ça", 'exactement', 'bien sûr', 'ah', 'oh'];
+const INTERRUPTIONS_FR = ['non', 'attendez', 'attends', 'stop', 'pardon', 'excusez-moi', 'mais', 'une seconde', 'minute'];

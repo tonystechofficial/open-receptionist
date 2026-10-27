@@ -145,6 +145,12 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   }
   if (cfg.demonstration !== undefined && typeof cfg.demonstration !== 'boolean') errors.push('demonstration must be true or false');
 
+  // Assistant settings a client may change: words the transcriber should catch (the business name is
+  // always one), Vapi's end-of-turn model, and the language model.
+  if (cfg.motsCles !== undefined && !texts(cfg.motsCles)) errors.push('motsCles must be a list of texts');
+  if (cfg.smartEndpointing !== undefined && typeof cfg.smartEndpointing !== 'boolean') errors.push('smartEndpointing must be true or false');
+  if (cfg.model !== undefined && (typeof cfg.model !== 'string' || !cfg.model.trim())) errors.push('model must be the name of an OpenAI model, such as "gpt-4.1-mini"');
+
   // Transfer to the business: a number the agent can dial, and hours the webhook can read. Unreadable
   // hours only warn: the webhook then refuses every transfer, and the calls go on.
   const transfert = cfg.transfert ?? {};

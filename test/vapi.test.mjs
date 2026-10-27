@@ -237,3 +237,66 @@ test('the intervention journey keeps its tools as they were', () => {
   assert.equal(note.function.parameters.properties.entreprise, undefined);
   assert.ok(note.function.parameters.properties.ville);
 });
+
+// Assistant settings (2026-10-27): what the first real call and Vapi's English defaults called for.
+test('the calendar tools say what they are doing while they run, in French and with vous', () => {
+  const a = vapi.buildAssistant(config, {});
+  const check = functionTools(a).find((t) => t.function.name === 'verifier_dispos');
+  const starts = check.messages.filter((m) => m.type === 'request-start').map((m) => m.content);
+  assert.ok(starts.length >= 2, 'variants, so the agent does not repeat itself');
+  assert.ok(starts.every((s) => /agenda|disponibilités/.test(s)), starts.join(' | '));
+  assert.ok(check.messages.some((m) => m.type === 'request-response-delayed' && m.timingMilliseconds > 0));
+  const book = functionTools(a).find((t) => t.function.name === 'prendre_rdv');
+  assert.ok(book.messages.some((m) => m.type === 'request-start' && /réserve/.test(m.content)));
+  assert.doesNotMatch(JSON.stringify([check.messages, book.messages]), /donne-moi|attends/);
+});
+
+test('in the discovery journey, noting an answer does not make the caller wait', () => {
+  const note = (c) => functionTools(vapi.buildAssistant(c, {})).find((t) => t.function.name === 'noter_demande');
+  assert.equal(note(discovery).async, true);
+  assert.notEqual(note(config).async, true, 'the trades journey needs the service-area answer');
+});
+
+test('a silent caller is asked whether they are still there, twice at most, before the call ends', () => {
+  const a = vapi.buildAssistant(config, {});
+  const hook = a.hooks.find((h) => h.on === 'customer.speech.timeout');
+  assert.ok(hook.options.timeoutSeconds < a.silenceTimeoutSeconds);
+  assert.equal(hook.options.triggerMaxCount, 2);
+  assert.equal(hook.options.triggerResetMode, 'onUserSpeech');
+  assert.ok(hook.do[0].exact.some((s) => /toujours là/.test(s)));
+});
+
+test('the transcriber knows the business name, and the words a client adds', () => {
+  const a = vapi.buildAssistant(discovery, {});
+  assert.ok(a.transcriber.keyterm.includes("Tony's Tech"));
+  assert.ok(a.transcriber.keyterm.includes('Tony'));
+  const { config: more } = validateClientConfig({ ...discovery, motsCles: ['Cal.com'] });
+  assert.ok(vapi.buildAssistant(more, {}).transcriber.keyterm.includes('Cal.com'));
+});
+
+test('French acknowledgements do not cut the agent off, French interruptions do', () => {
+  const plan = vapi.buildAssistant(config, {}).stopSpeakingPlan;
+  assert.ok(plan.acknowledgementPhrases.includes("d'accord"));
+  assert.ok(plan.interruptionPhrases.includes('attendez'));
+  assert.ok(plan.numWords >= 1, 'counted on words, so an acknowledgement is recognised before it interrupts');
+});
+
+test("Vapi's end-of-turn model is on for French, and a client can turn it off", () => {
+  assert.equal(vapi.buildAssistant(config, {}).startSpeakingPlan.smartEndpointingPlan.provider, 'vapi');
+  const { config: off } = validateClientConfig({ ...config, smartEndpointing: false });
+  assert.equal(vapi.buildAssistant(off, {}).startSpeakingPlan, undefined);
+});
+
+test('the closing words suit any hour, and the model can be changed per client', () => {
+  const a = vapi.buildAssistant(config, {});
+  assert.equal(a.endCallMessage, 'Merci de votre appel, à bientôt.');
+  assert.equal(a.model.model, 'gpt-4o-mini');
+  const { config: other } = validateClientConfig({ ...config, model: 'gpt-4.1-mini' });
+  assert.equal(vapi.buildAssistant(other, {}).model.model, 'gpt-4.1-mini');
+});
+
+test('a transfer is announced once, by the transfer tool itself', () => {
+  const prompt = vapi.buildAssistant(withTransfer, {}).model.messages[0].content;
+  assert.doesNotMatch(prompt, /annonce la mise en relation/);
+  assert.match(prompt, /transferCall sans rien annoncer/);
+});

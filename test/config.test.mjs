@@ -254,3 +254,10 @@ test('the discovery settings are checked, since the agent reads them out', () =>
   const all = r.errors.join(' | ');
   for (const field of ['echange\.quoi', 'qualification', 'exemples', 'demonstration']) assert.match(all, new RegExp(field));
 });
+
+test('the assistant settings a client can change are checked', () => {
+  const r = validateClientConfig({ ...LUNE, motsCles: 'Cal.com', smartEndpointing: 'oui', model: '' });
+  assert.equal(r.ok, false);
+  const all = r.errors.join(' | ');
+  for (const field of ['motsCles', 'smartEndpointing', 'model']) assert.match(all, new RegExp(field));
+});

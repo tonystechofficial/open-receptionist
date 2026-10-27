@@ -258,7 +258,7 @@ function transferRequest(args, ctx) {
   const hours = ctx.config.transfert?.horaires;
   const decision = transferDecision({ reason: args.motif, now: ctx.now, hours, timeZone: ctx.timeZone });
   if (decision.allowed) {
-    return `Transfert autorisé. Dis à l'appelant que tu le mets en relation avec ${ctx.company}, puis appelle transferCall. Si personne ne répond, note la demande avec noter_demande et dis que ${ctx.company} rappelle au plus vite.`;
+    return `Transfert autorisé : appelle transferCall sans rien annoncer, le message de mise en relation part tout seul. Si personne ne répond, note la demande avec noter_demande et dis que ${ctx.company} rappelle au plus vite.`;
   }
   if (decision.why === 'reason') {
     return "Le transfert est réservé aux urgences et aux appelants qui demandent à parler à une personne. Continue la conversation sans transférer.";
