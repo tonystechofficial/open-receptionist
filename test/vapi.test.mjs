@@ -115,6 +115,11 @@ test('the tools take the town and the address of the job', () => {
   }
 });
 
+test('the agent can pass the precise time a caller names', () => {
+  const check = functionTools(vapi.buildAssistant(config, {})).find((t) => t.function.name === 'verifier_dispos');
+  assert.ok(check.function.parameters.properties.heure);
+});
+
 // Transfer to the business (2026-10-25): only when a number is configured, gated by the webhook,
 // and with a way back to the assistant when nobody answers.
 const { config: withTransfer } = validateClientConfig({

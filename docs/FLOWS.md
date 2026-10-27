@@ -23,9 +23,11 @@ All three post to one endpoint, `/api/vapi`, which also receives the end-of-call
    `noter_demande`.
 3. The agent asks the name. It offers to call back on the number the call came from, read from the
    caller ID, instead of asking for it.
-4. `verifier_dispos` returns « option 1, aujourd'hui à 14 heures ; option 2, demain à 9 heures 30 ».
-   The first option is the earliest slot; the second is at least three hours later, so the choice is
-   real. Times are in Paris time and survive the clock change.
+4. `verifier_dispos` returns « option 1, aujourd'hui, jeudi 22 octobre, à 14 heures ; option 2,
+   demain, vendredi 23 octobre, à 9 heures 30 ». The first option is the earliest slot; the second is
+   at least three hours later, so the choice is real. Times are in Paris time and survive the clock
+   change. Today and tomorrow carry their weekday and date: said just after midnight, « demain »
+   alone was booked for a day the caller did not mean.
 5. The caller picks; `prendre_rdv` books option 1 or 2 in Cal.com, with a UTC start, the phone in
    international form, the need in the notes and the urgency in the metadata. The appointment is
    written to D1, and a caller on a mobile receives one SMS:
@@ -41,6 +43,10 @@ All three post to one endpoint, `/api/vapi`, which also receives the end-of-call
 « Plutôt demain matin » becomes `verifier_dispos` with `jour = demain` and `moment = matin`. The
 webhook understands aujourd'hui, demain, après-demain, weekday names and `AAAA-MM-JJ` dates, and
 matin, après-midi and soir. If nothing fits, the agent says so and offers the nearest slots instead.
+
+« Demain à midi » also passes `heure = 12:00`. When that exact time is free, it comes back alone, as
+the slot to confirm, instead of two options to choose from; when it is taken, the agent says so and
+offers the nearest slots that day.
 
 ## 3. An emergency
 

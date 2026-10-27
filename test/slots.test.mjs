@@ -1,20 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatSlotFr, resolvePreferredDay, filterSlots, offerSlots, withoutSlot, sameInstant } from '../src/core/slots.mjs';
+import { formatSlotFr, resolvePreferredDay, filterSlots, offerSlots, withoutSlot, sameInstant, parseHeure, exactSlot } from '../src/core/slots.mjs';
 
 const NOW = new Date('2026-10-22T07:00:00Z'); // jeudi 22 octobre 2026, 9 h à Paris (heure d'été)
 const TZ = 'Europe/Paris';
 
-test("speech label: a slot later today reads aujourd'hui", () => {
-  assert.equal(formatSlotFr('2026-10-22T12:00:00Z', NOW, { timeZone: TZ }), "aujourd'hui à 14 heures");
+test("speech label: a slot later today reads aujourd'hui, with its weekday and date", () => {
+  assert.equal(formatSlotFr('2026-10-22T12:00:00Z', NOW, { timeZone: TZ }), "aujourd'hui, jeudi 22 octobre, à 14 heures");
 });
 
-test('speech label: tomorrow, with minutes', () => {
-  assert.equal(formatSlotFr('2026-10-23T07:30:00Z', NOW, { timeZone: TZ }), 'demain à 9 heures 30');
+test('speech label: tomorrow, with its weekday and date, and minutes', () => {
+  assert.equal(formatSlotFr('2026-10-23T07:30:00Z', NOW, { timeZone: TZ }), 'demain, vendredi 23 octobre, à 9 heures 30');
 });
 
 test('speech label: noon reads midi', () => {
-  assert.equal(formatSlotFr('2026-10-23T10:00:00Z', NOW, { timeZone: TZ }), 'demain à midi');
+  assert.equal(formatSlotFr('2026-10-23T10:00:00Z', NOW, { timeZone: TZ }), 'demain, vendredi 23 octobre, à midi');
 });
 
 test('speech label: after the October clock change Paris is UTC+1', () => {
@@ -26,7 +26,7 @@ test('speech label: first of the month reads 1er, one o clock reads 1 heure', ()
 });
 
 test('speech label: accepts the offset timestamps Cal.com returns', () => {
-  assert.equal(formatSlotFr('2026-10-23T09:30:00.000+02:00', NOW, { timeZone: TZ }), 'demain à 9 heures 30');
+  assert.equal(formatSlotFr('2026-10-23T09:30:00.000+02:00', NOW, { timeZone: TZ }), 'demain, vendredi 23 octobre, à 9 heures 30');
 });
 
 test('written label for an SMS: absolute date, French typography', () => {
@@ -63,6 +63,26 @@ test('filterSlots keeps the preferred part of the day', () => {
 
 test('filterSlots ignores wishes it does not understand', () => {
   assert.deepEqual(filterSlots(SLOTS, { jour: 'bientôt', moment: 'tôt' }, NOW, TZ), SLOTS);
+});
+
+// A named time (2026-10-27): the first real call asked for "demain à midi" and got two options again.
+test('parseHeure reads the times a caller names', () => {
+  assert.deepEqual(parseHeure('12:00'), { h: 12, min: 0 });
+  assert.deepEqual(parseHeure('14h30'), { h: 14, min: 30 });
+  assert.deepEqual(parseHeure('14 h 30'), { h: 14, min: 30 });
+  assert.deepEqual(parseHeure('9h'), { h: 9, min: 0 });
+  assert.deepEqual(parseHeure('midi'), { h: 12, min: 0 });
+  assert.equal(parseHeure('dans la matinée'), null);
+  assert.equal(parseHeure('25:00'), null);
+  assert.equal(parseHeure(undefined), null);
+});
+
+test('exactSlot finds the free slot at the named time, on the named day', () => {
+  assert.equal(exactSlot(SLOTS, { jour: 'demain', heure: '14:00' }, NOW, TZ), '2026-10-23T12:00:00Z');
+  assert.equal(exactSlot(SLOTS, { heure: '14h' }, NOW, TZ), '2026-10-22T12:00:00Z');
+  assert.equal(exactSlot(SLOTS, { jour: 'demain', heure: '11:00' }, NOW, TZ), null);
+  assert.equal(exactSlot(SLOTS, { jour: 'demain' }, NOW, TZ), null);
+  assert.equal(exactSlot(['2026-10-22T06:00:00Z'], { heure: '8h' }, NOW, TZ), null); // 8 h today is past
 });
 
 test('offerSlots proposes the earliest slot and one genuinely different alternative', () => {

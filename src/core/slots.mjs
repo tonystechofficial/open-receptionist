@@ -29,7 +29,9 @@ function speechTime(h, min) {
 
 /**
  * French label for a slot.
- * style 'speech' (default) is meant to be read aloud: "aujourd'hui à 14 heures", "demain à 9 heures 30".
+ * style 'speech' (default) is meant to be read aloud: "aujourd'hui, jeudi 22 octobre, à 14 heures",
+ * "demain, vendredi 23 octobre, à 9 heures 30". Today and tomorrow carry their weekday and date: said
+ * just after midnight, "demain" alone is booked for a day the caller did not mean (first call, 27/10).
  * style 'written' is absolute, for an SMS read later: "vendredi 23 octobre à 9 h 30".
  */
 export function formatSlotFr(iso, now = new Date(), { timeZone = 'Europe/Paris', style = 'speech' } = {}) {
@@ -41,8 +43,10 @@ export function formatSlotFr(iso, now = new Date(), { timeZone = 'Europe/Paris',
     return `${date} à ${time}`;
   }
   const diff = dayIndex(at) - dayIndex(localParts(now, timeZone));
-  const day = diff === 0 ? "aujourd'hui" : diff === 1 ? 'demain' : date;
-  return `${day} à ${speechTime(at.h, at.min)}`;
+  const time = speechTime(at.h, at.min);
+  if (diff === 0) return `aujourd'hui, ${date}, à ${time}`;
+  if (diff === 1) return `demain, ${date}, à ${time}`;
+  return `${date} à ${time}`;
 }
 
 const normalize = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
@@ -86,6 +90,34 @@ export function filterSlots(slots, { jour, moment } = {}, now = new Date(), time
     if (range && !(p.h >= range[0] && p.h < range[1])) return false;
     return true;
   });
+}
+
+/** A time a caller names, as the agent passes it ("12:00", "14h30", "9 h", "midi"); null otherwise. */
+export function parseHeure(heure) {
+  const key = String(heure ?? '').trim().toLowerCase();
+  if (key === 'midi') return { h: 12, min: 0 };
+  if (key === 'minuit') return { h: 0, min: 0 };
+  const m = key.match(/^(\d{1,2})\s*(?:h|:|heures?)\s*(\d{2})?$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2] ?? 0);
+  return h < 24 && min < 60 ? { h, min } : null;
+}
+
+/**
+ * The free slot at the exact time the caller named, on the day they named if any, earliest first.
+ * Null when they named no time, or when that time is not free: the caller then hears the nearest ones.
+ */
+export function exactSlot(slots, { jour, heure } = {}, now = new Date(), timeZone = 'Europe/Paris') {
+  const time = parseHeure(heure);
+  if (!time) return null;
+  const day = resolvePreferredDay(jour, now, timeZone);
+  const matches = (slots || [])
+    .map((s) => ({ s, ms: new Date(s).getTime(), p: localParts(new Date(s), timeZone) }))
+    .filter((x) => Number.isFinite(x.ms) && x.ms >= now.getTime())
+    .filter((x) => x.p.h === time.h && x.p.min === time.min && (!day || isoDate(x.p) === day))
+    .sort((a, b) => a.ms - b.ms);
+  return matches[0]?.s ?? null;
 }
 
 export function sameInstant(a, b) {

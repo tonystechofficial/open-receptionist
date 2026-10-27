@@ -3,7 +3,7 @@
 // the notifiers. Every tool call returns one line for the agent and never throws: an error in a
 // webhook would leave the caller in silence. See docs/FLOWS.md for each flow in plain words.
 import { qualify, mergeCaller } from '../core/qualify.mjs';
-import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant, withoutSlot } from '../core/slots.mjs';
+import { offerSlots, filterSlots, formatSlotFr, resolvePreferredDay, sameInstant, withoutSlot, exactSlot, parseHeure } from '../core/slots.mjs';
 import { confirmationSms, ownerRecap, jobPlace } from '../core/messages.mjs';
 import { normalizePhone, smsRefusal } from '../core/phone.mjs';
 import { inZone } from '../core/zone.mjs';
@@ -124,6 +124,13 @@ async function checkAvailability(args, ctx) {
   const days = Math.min(30, Math.max(clampDays(args.jours), preferredDay ? daysUntilDate(preferredDay, ctx) + 1 : 0));
   const slots = await fetchSlots(ctx, days);
 
+  // A time the caller named and that is free is the slot to confirm, not one of two to choose from.
+  const exact = exactSlot(slots, { jour: args.jour, heure: args.heure }, ctx.now, ctx.timeZone);
+  if (exact) {
+    await ctx.deps.store.upsertCall(ctx.callId, { offered: [exact] });
+    return `Le moment demandé est libre : option 1, ${formatSlotFr(exact, ctx.now, { timeZone: ctx.timeZone })}. Confirme-le avec l'appelant, puis appelle prendre_rdv avec creneau = 1.`;
+  }
+
   const wished = filterSlots(slots, { jour: args.jour, moment: args.moment }, ctx.now, ctx.timeZone);
   const unmatched = wished.length === 0 && slots.length > 0; // a wish was given and nothing fits it
   const offer = offerSlots(unmatched ? slots : wished, urgence, ctx.now);
@@ -136,7 +143,8 @@ async function checkAvailability(args, ctx) {
   if (urgence === 'immediate' && !offer.within) {
     lead.push(`Aucun créneau dans les 4 heures : dis que l'urgence est notée en priorité et que ${ctx.company} rappelle au plus vite, puis propose quand même ces créneaux.`);
   }
-  if (unmatched) lead.push('Aucun créneau ne correspond à ce souhait ; voici les plus proches.');
+  if (parseHeure(args.heure)) lead.push("Ce moment précis n'est pas libre ; voici les plus proches.");
+  else if (unmatched) lead.push('Aucun créneau ne correspond à ce souhait ; voici les plus proches.');
   return [...lead, describeOptions(offer.options, ctx)].join(' ');
 }
 

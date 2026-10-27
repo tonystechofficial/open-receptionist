@@ -83,8 +83,8 @@ test('availability offers at most two French-labelled options, never raw timesta
   const r = first(await H.handleToolCall(tool('verifier_dispos', { urgence: 'normale' }), deps));
   assert.equal(r.name, 'verifier_dispos');
   assert.equal(r.toolCallId, 't1');
-  assert.ok(r.result.includes("option 1, aujourd'hui à 14 heures"), r.result);
-  assert.ok(r.result.includes("option 2, aujourd'hui à 17 heures"), r.result);
+  assert.ok(r.result.includes("option 1, aujourd'hui, jeudi 22 octobre, à 14 heures"), r.result);
+  assert.ok(r.result.includes("option 2, aujourd'hui, jeudi 22 octobre, à 17 heures"), r.result);
   assert.ok(!r.result.includes('option 3'), r.result);
   assert.doesNotMatch(r.result, /\d{4}-\d{2}-\d{2}T/);
   assert.doesNotMatch(r.result, /\n/);
@@ -93,15 +93,33 @@ test('availability offers at most two French-labelled options, never raw timesta
 test('availability honours a preferred day and part of the day', async () => {
   const { deps } = setup();
   const r = first(await H.handleToolCall(tool('verifier_dispos', { jour: 'demain', moment: 'matin' }), deps));
-  assert.ok(r.result.includes('option 1, demain à 9 heures 30'), r.result);
-  assert.ok(r.result.includes('option 2, demain à 10 heures'), r.result);
+  assert.ok(r.result.includes('option 1, demain, vendredi 23 octobre, à 9 heures 30'), r.result);
+  assert.ok(r.result.includes('option 2, demain, vendredi 23 octobre, à 10 heures'), r.result);
 });
 
 test('availability says when nothing matches the wish and offers the nearest slots instead', async () => {
   const { deps } = setup();
   const r = first(await H.handleToolCall(tool('verifier_dispos', { jour: 'dimanche' }), deps));
   assert.match(r.result, /ne correspond/);
-  assert.ok(r.result.includes("option 1, aujourd'hui à 14 heures"), r.result);
+  assert.ok(r.result.includes("option 1, aujourd'hui, jeudi 22 octobre, à 14 heures"), r.result);
+});
+
+// A named time (2026-10-27): the first real call asked for "demain à midi" and got two options again.
+test('a free slot at the time the caller named comes back alone, to confirm', async () => {
+  const { deps } = setup();
+  const r = first(await H.handleToolCall(tool('verifier_dispos', { jour: 'demain', heure: '14:00' }), deps));
+  assert.ok(r.result.includes('option 1, demain, vendredi 23 octobre, à 14 heures'), r.result);
+  assert.ok(!r.result.includes('option 2'), r.result);
+  assert.match(r.result, /confirme/i);
+  assert.deepEqual((await deps.store.getCall('call_1')).offered, ['2026-10-23T12:00:00Z']);
+});
+
+test('a named time that is taken gets the nearest slots that day, and says so', async () => {
+  const { deps } = setup();
+  const r = first(await H.handleToolCall(tool('verifier_dispos', { jour: 'demain', heure: '11:00' }), deps));
+  assert.match(r.result, /pas libre/);
+  assert.ok(r.result.includes('option 1, demain, vendredi 23 octobre, à 9 heures 30'), r.result);
+  assert.ok(r.result.includes('option 2'), r.result);
 });
 
 test('an emergency with no slot within four hours gets a priority call-back promise', async () => {
@@ -132,7 +150,7 @@ test('booking by option number books the offered instant in UTC, with the caller
   assert.equal(cal.booked.length, 1);
   assert.equal(cal.booked[0].start, '2026-10-22T12:00:00.000Z');
   assert.equal(cal.booked[0].phone, '+33612345678');
-  assert.match(r.result, /Rendez-vous confirmé pour aujourd'hui à 14 heures/);
+  assert.match(r.result, /Rendez-vous confirmé pour aujourd'hui, jeudi 22 octobre, à 14 heures/);
 });
 
 test('a slot taken between the offer and the booking is re-offered, not an error', async () => {
@@ -142,7 +160,7 @@ test('a slot taken between the offer and the booking is re-offered, not an error
   const r = first(await H.handleToolCall(tool('prendre_rdv', { creneau: '1', nom: 'Jean Dupont', besoin: 'fuite' }, { id: 't2' }), deps));
   assert.equal(cal.booked.length, 0);
   assert.match(r.result, /vient d'être pris/);
-  assert.ok(r.result.includes("option 1, aujourd'hui à 14 heures 30"), r.result);
+  assert.ok(r.result.includes("option 1, aujourd'hui, jeudi 22 octobre, à 14 heures 30"), r.result);
 });
 
 test('after a re-offer, option 1 means the new first slot', async () => {

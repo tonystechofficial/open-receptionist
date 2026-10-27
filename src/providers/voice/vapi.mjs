@@ -198,6 +198,7 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
         urgence: URGENCE,
         jour: { type: 'string', description: "Jour souhaité, tel que l'appelant le dit : aujourd'hui, demain, lundi, ou une date AAAA-MM-JJ." },
         moment: { type: 'string', enum: ['matin', 'après-midi', 'soir'], description: 'Moment de la journée souhaité.' },
+        heure: { type: 'string', description: "Heure précise souhaitée, seulement si l'appelant en donne une, au format HH:MM : 12:00 pour midi, 14:30." },
         jours: { type: 'number', description: 'Nombre de jours à regarder, 7 par défaut.' },
       },
     }),
