@@ -225,7 +225,7 @@ a setting changes, then deploy. Editing the `[vars]` block by hand works too:
 | `NOTIFY_SMS` | optional: mobile numbers (`06`, `07`) for an SMS recap, comma-separated, written as usual, such as `06 12 34 56 78`. A landline is refused |
 | `CONFIRM_CALLER_SMS` | `true`, or `false` to stop texting callers |
 | `CALCOM_EVENT_TYPE_ID` | the event type id from step 1.2 |
-| `MAIL_FROM` | a sender on the verified Resend domain, such as `Accueil <accueil@yourdomain.fr>` |
+| `MAIL_FROM` | a sender on the verified Resend domain, such as `Accueil <accueil@yourdomain.fr>`. A Gmail address is refused. Before a domain is verified, `Accueil <onboarding@resend.dev>` sends test emails, but only to the Resend account's own address, spelled exactly as Resend shows it: Gmail ignores the dots in an address, Resend does not |
 | `SMS_SENDER` | the business's short name from step 1.6: 3 to 11 letters or digits with at least one letter, never a generic name such as `Info` or `Accueil`. Required when SMS is on |
 | `ALERT_EMAIL` | who receives the daily check's alerts and the immediate flood alert, usually you. Defaults to the first `NOTIFY_EMAIL` |
 | `TRANSFER_HOURS` | optional: when an emergency or a caller asking for a person may be put through to `transfert.numero` (step 4.2), Paris time, such as `lun-ven 8h-18h; sam 9h-12h30`. Empty: any hour, night included |
