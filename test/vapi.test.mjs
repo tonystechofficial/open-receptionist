@@ -285,7 +285,17 @@ test('a pronunciation rewrites what the voice says, every time, with either apos
     { type: 'exact', key: 'Tony’s Tech', value: 'Tonyz Tech', replaceAllEnabled: true },
   ]);
   assert.equal(a.voice.voiceId, 'fr-FR-DeniseNeural', 'the voice itself is unchanged');
-  assert.match(a.firstMessage, /Tony's Tech/, 'the written text keeps the real name');
+  assert.match(a.model.messages[0].content, /Tony's Tech/, 'the prompt keeps the real name');
+});
+
+// Heard on a real call (04/11/2026): the replacements were live on the assistant, yet the first
+// sentence still said « Tony esse tech ». Vapi sends firstMessage to the voice without them.
+test('the first sentence is written the way the voice must say it', () => {
+  const { config: c } = validateClientConfig({ ...discovery, prononciation: { "Tony's Tech": 'Tonyz Tech' } });
+  const first = vapi.buildAssistant(c, {}).firstMessage;
+  assert.match(first, /Tonyz Tech/);
+  assert.doesNotMatch(first, /Tony['’]s Tech/);
+  assert.match(vapi.buildAssistant(discovery, {}).firstMessage, /Tony's Tech/, 'unchanged without a pronunciation');
 });
 
 test('longer words are replaced before the shorter ones they contain', () => {

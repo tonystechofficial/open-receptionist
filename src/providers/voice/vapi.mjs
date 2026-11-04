@@ -387,7 +387,9 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
   const french = (c.language ?? 'fr') === 'fr';
   return {
     name: `${c.company} - accueil`.slice(0, 40), // Vapi rejects names over 40 characters
-    firstMessage: greeting(c),
+    // Vapi sends firstMessage to the voice without the replacements below (heard 04/11/2026): it is
+    // written the spoken way, so its transcript shows that spelling.
+    firstMessage: spoken(greeting(c), c.prononciation),
     firstMessageMode: 'assistant-speaks-first',
     maxDurationSeconds: c.maxDurationSeconds ?? 300, // hard cap: the call is cut, whatever happens
     silenceTimeoutSeconds: c.silenceTimeoutSeconds ?? 30, // ends a call left open in silence
@@ -429,15 +431,23 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
  * Vapi rewrites each text chunk just before the voice provider, so transcripts and the prompt keep the
  * real spelling. Every occurrence, both apostrophes (the model writes either), longest words first.
  */
-function withPronunciation(voice, prononciation) {
-  const entries = Object.entries(prononciation ?? {});
-  if (!entries.length) return voice;
-  const replacements = [];
-  for (const [key, value] of entries.sort(([a], [b]) => b.length - a.length)) {
-    for (const k of new Set([key, key.replaceAll("'", '’'), key.replaceAll('’', "'")])) {
-      replacements.push({ type: 'exact', key: k, value, replaceAllEnabled: true });
-    }
+function pronunciationPairs(prononciation) {
+  const pairs = [];
+  for (const [key, value] of Object.entries(prononciation ?? {}).sort(([a], [b]) => b.length - a.length)) {
+    for (const k of new Set([key, key.replaceAll("'", '’'), key.replaceAll('’', "'")])) pairs.push([k, value]);
   }
+  return pairs;
+}
+
+/** A fixed text the voice says as is, rewritten with the same pairs as the replacements. */
+function spoken(text, prononciation) {
+  return pronunciationPairs(prononciation).reduce((t, [k, v]) => t.replaceAll(k, v), text);
+}
+
+function withPronunciation(voice, prononciation) {
+  const pairs = pronunciationPairs(prononciation);
+  if (!pairs.length) return voice;
+  const replacements = pairs.map(([key, value]) => ({ type: 'exact', key, value, replaceAllEnabled: true }));
   const chunkPlan = voice.chunkPlan ?? {};
   const formatPlan = chunkPlan.formatPlan ?? {};
   return {
