@@ -346,6 +346,10 @@ Fill it with the **same** company, trade, hours, phone and recipients as the `[v
 - `motsCles`, `smartEndpointing` and `model`, optional: words the transcriber should catch on top of the
   business name, `false` to turn off Vapi's end-of-turn model, and another OpenAI model than
   `gpt-4o-mini`. See [FLOWS.md](FLOWS.md#13-a-long-silent-or-abusive-call).
+- `prononciation`, optional: how the voice should say a word it gets wrong, written word to spoken
+  word, such as `{ "Tony's Tech": "Tonyz Tech" }` (Azure Denise reads « Tony esse tech »). Only what
+  the voice says changes: transcripts, prompt and messages keep the real spelling. Listen to a call after
+  each change.
 
 `config/client.json` is ignored by git, like `wrangler.toml`. The Worker reads `wrangler.toml` and the assistant script
 reads `config/client.json`, so change both whenever a setting changes.

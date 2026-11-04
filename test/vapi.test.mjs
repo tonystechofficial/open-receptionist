@@ -274,6 +274,31 @@ test('the transcriber knows the business name, and the words a client adds', () 
   assert.ok(vapi.buildAssistant(more, {}).transcriber.keyterm.includes('Cal.com'));
 });
 
+// Azure Denise said « Tony esse tech » for "Tony's Tech" (04/11/2026). The text sent to the voice is
+// rewritten, the transcript and the prompt keep the real spelling.
+test('a pronunciation rewrites what the voice says, every time, with either apostrophe', () => {
+  const { config: c } = validateClientConfig({ ...discovery, prononciation: { "Tony's Tech": 'Tonyz Tech' } });
+  const a = vapi.buildAssistant(c, {});
+  const reps = a.voice.chunkPlan.formatPlan.replacements;
+  assert.deepEqual(reps, [
+    { type: 'exact', key: "Tony's Tech", value: 'Tonyz Tech', replaceAllEnabled: true },
+    { type: 'exact', key: 'Tony’s Tech', value: 'Tonyz Tech', replaceAllEnabled: true },
+  ]);
+  assert.equal(a.voice.voiceId, 'fr-FR-DeniseNeural', 'the voice itself is unchanged');
+  assert.match(a.firstMessage, /Tony's Tech/, 'the written text keeps the real name');
+});
+
+test('longer words are replaced before the shorter ones they contain', () => {
+  const { config: c } = validateClientConfig({ ...discovery, prononciation: { Tony: 'Toni', 'Tony Tech': 'Toni Tèque' } });
+  const keys = vapi.buildAssistant(c, {}).voice.chunkPlan.formatPlan.replacements.map((r) => r.key);
+  assert.deepEqual(keys, ['Tony Tech', 'Tony']);
+});
+
+test('without a pronunciation, the voice is sent as configured', () => {
+  const a = vapi.buildAssistant(config, {});
+  assert.deepEqual(a.voice, { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' });
+});
+
 test('French acknowledgements do not cut the agent off, French interruptions do', () => {
   const plan = vapi.buildAssistant(config, {}).stopSpeakingPlan;
   assert.ok(plan.acknowledgementPhrases.includes("d'accord"));

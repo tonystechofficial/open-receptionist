@@ -411,7 +411,7 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
     ...(french ? { stopSpeakingPlan: { numWords: 1, acknowledgementPhrases: ACKNOWLEDGEMENTS_FR, interruptionPhrases: INTERRUPTIONS_FR } } : {}),
     // Vapi's own end-of-turn model, which it recommends for languages other than English.
     ...(c.smartEndpointing === false ? {} : { startSpeakingPlan: { smartEndpointingPlan: { provider: 'vapi' } } }),
-    voice: c.voice ?? { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' },
+    voice: withPronunciation(c.voice ?? { provider: 'azure', voiceId: 'fr-FR-DeniseNeural' }, c.prononciation),
     model: {
       provider: 'openai',
       model: c.model || 'gpt-4o-mini',
@@ -421,6 +421,28 @@ export function buildAssistant(c, { webhookBaseUrl, credentialId, serverSecret }
     },
     ...(server ? { server } : {}),
     serverMessages: ['end-of-call-report'],
+  };
+}
+
+/**
+ * Words the voice says wrong (Azure Denise read "Tony's Tech" as « Tony esse tech », 04/11/2026):
+ * Vapi rewrites each text chunk just before the voice provider, so transcripts and the prompt keep the
+ * real spelling. Every occurrence, both apostrophes (the model writes either), longest words first.
+ */
+function withPronunciation(voice, prononciation) {
+  const entries = Object.entries(prononciation ?? {});
+  if (!entries.length) return voice;
+  const replacements = [];
+  for (const [key, value] of entries.sort(([a], [b]) => b.length - a.length)) {
+    for (const k of new Set([key, key.replaceAll("'", '’'), key.replaceAll('’', "'")])) {
+      replacements.push({ type: 'exact', key: k, value, replaceAllEnabled: true });
+    }
+  }
+  const chunkPlan = voice.chunkPlan ?? {};
+  const formatPlan = chunkPlan.formatPlan ?? {};
+  return {
+    ...voice,
+    chunkPlan: { ...chunkPlan, formatPlan: { ...formatPlan, replacements: [...(formatPlan.replacements ?? []), ...replacements] } },
   };
 }
 

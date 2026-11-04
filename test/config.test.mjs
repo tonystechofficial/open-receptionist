@@ -51,6 +51,15 @@ test('keeps an explicit voice override', () => {
   assert.equal(r.config.voice.provider, '11labs');
 });
 
+test('a pronunciation is a map of written words to spoken words', () => {
+  assert.equal(validateClientConfig({ ...base, prononciation: { "Tony's Tech": 'Tonyz Tech' } }).ok, true);
+  for (const bad of [['Tonyz'], { "Tony's Tech": '' }, { '': 'x' }, 'Tonyz', { a: 1 }]) {
+    const r = validateClientConfig({ ...base, prononciation: bad });
+    assert.equal(r.ok, false, JSON.stringify(bad));
+    assert.match(r.errors.join(' '), /prononciation/);
+  }
+});
+
 test('defaults the time zone to Paris and turns the caller SMS confirmation on', () => {
   const r = validateClientConfig(base);
   assert.equal(r.config.timeZone, 'Europe/Paris');

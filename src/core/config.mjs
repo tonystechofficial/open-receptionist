@@ -148,6 +148,13 @@ export function validateClientConfig(cfg = {}, { providers } = {}) {
   // Assistant settings a client may change: words the transcriber should catch (the business name is
   // always one), Vapi's end-of-turn model, and the language model.
   if (cfg.motsCles !== undefined && !texts(cfg.motsCles)) errors.push('motsCles must be a list of texts');
+  // How the voice should say a word it gets wrong, such as { "Tony's Tech": "Tonyz Tech" }.
+  const p = cfg.prononciation;
+  const filled = (s) => typeof s === 'string' && s.trim() !== '';
+  if (p !== undefined && !(p && typeof p === 'object' && !Array.isArray(p)
+    && Object.entries(p).every(([k, v]) => filled(k) && filled(v)))) {
+    errors.push('prononciation must map written words to spoken words, such as { "Tony\'s Tech": "Tonyz Tech" }');
+  }
   if (cfg.smartEndpointing !== undefined && typeof cfg.smartEndpointing !== 'boolean') errors.push('smartEndpointing must be true or false');
   if (cfg.model !== undefined && (typeof cfg.model !== 'string' || !cfg.model.trim())) errors.push('model must be the name of an OpenAI model, such as "gpt-4.1-mini"');
 

@@ -171,6 +171,8 @@ The rest of the call's pacing, set by `npm run vapi:setup`:
 - Vapi's end-of-turn model is on (`smartEndpointing: false` turns it off): check on a real call that
   it never cuts off a caller dictating a number.
 - The transcriber is told the business name, the person's name and `motsCles`.
+- `prononciation` rewrites words just before the voice says them (Vapi `voice.chunkPlan.formatPlan.replacements`,
+  every occurrence, straight or curly apostrophe); the transcript keeps the written word.
 - `endCallMessage` is « Merci de votre appel, à bientôt. », right at any hour; `model` changes the
   language model (`gpt-4o-mini` by default).
 
